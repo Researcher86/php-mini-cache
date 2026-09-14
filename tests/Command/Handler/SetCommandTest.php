@@ -27,7 +27,7 @@ final class SetCommandTest extends TestCase
             RespValue::bulkString('Tanat'),
         ]));
 
-        $result = (new SetCommand())->handle($command, $store, $this->createConnection());
+        $result = new SetCommand()->handle($command, $store, $this->createConnection());
 
         self::assertSame(RespType::SimpleString, $result->type);
         self::assertSame('OK', $result->value);
@@ -41,7 +41,7 @@ final class SetCommandTest extends TestCase
             RespValue::bulkString('name'),
         ]));
 
-        $result = (new SetCommand())->handle($command, new InMemoryStore(), $this->createConnection());
+        $result = new SetCommand()->handle($command, new InMemoryStore(), $this->createConnection());
 
         self::assertSame(RespType::Error, $result->type);
     }
@@ -58,7 +58,7 @@ final class SetCommandTest extends TestCase
             RespValue::bulkString('60'),
         ]));
 
-        $result = (new SetCommand())->handle($command, $store, $this->createConnection());
+        $result = new SetCommand()->handle($command, $store, $this->createConnection());
 
         self::assertSame('OK', $result->value);
         self::assertSame('abc', $store->get('session'));
@@ -77,7 +77,7 @@ final class SetCommandTest extends TestCase
             RespValue::bulkString('soon'),
         ]));
 
-        $result = (new SetCommand())->handle($command, new InMemoryStore(), $this->createConnection());
+        $result = new SetCommand()->handle($command, new InMemoryStore(), $this->createConnection());
 
         self::assertSame(RespType::Error, $result->type);
     }
@@ -99,7 +99,7 @@ final class SetCommandTest extends TestCase
             RespValue::bulkString($ttl),
         ]));
 
-        $result = (new SetCommand())->handle($command, $store, $this->createConnection());
+        $result = new SetCommand()->handle($command, $store, $this->createConnection());
 
         self::assertSame(RespType::Error, $result->type);
         self::assertSame("ERR invalid expire time in 'set' command", $result->value);

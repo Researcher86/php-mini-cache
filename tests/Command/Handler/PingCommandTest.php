@@ -19,7 +19,7 @@ final class PingCommandTest extends TestCase
     {
         $command = Command::fromRespValue(RespValue::array([RespValue::bulkString('PING')]));
 
-        $result = (new PingCommand())->handle($command, new InMemoryStore(), $this->createConnection());
+        $result = new PingCommand()->handle($command, new InMemoryStore(), $this->createConnection());
 
         self::assertSame('PONG', $result->value);
     }
@@ -31,7 +31,7 @@ final class PingCommandTest extends TestCase
             RespValue::bulkString('hello'),
         ]));
 
-        $result = (new PingCommand())->handle($command, new InMemoryStore(), $this->createConnection());
+        $result = new PingCommand()->handle($command, new InMemoryStore(), $this->createConnection());
 
         self::assertSame('hello', $result->value);
     }

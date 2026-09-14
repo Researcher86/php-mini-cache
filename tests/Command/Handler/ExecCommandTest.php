@@ -30,7 +30,7 @@ final class ExecCommandTest extends TestCase
         $transactions->queue($connection, $this->command('GET', ['foo']));
 
         $command = $this->command('EXEC');
-        $result = (new ExecCommand($transactions, $dispatcher))->handle($command, $store, $connection);
+        $result = new ExecCommand($transactions, $dispatcher)->handle($command, $store, $connection);
 
         self::assertSame(RespType::Array, $result->type);
         self::assertSame('OK', $result->value[0]->value);
@@ -43,7 +43,7 @@ final class ExecCommandTest extends TestCase
         $transactions = new TransactionManager();
         $dispatcher = CommandDispatcher::withDefaultHandlers();
 
-        $result = (new ExecCommand($transactions, $dispatcher))
+        $result = new ExecCommand($transactions, $dispatcher)
             ->handle($this->command('EXEC'), new InMemoryStore(), $this->createConnection());
 
         self::assertSame(RespType::Error, $result->type);

@@ -27,7 +27,7 @@ final class ExistsCommandTest extends TestCase
             RespValue::bulkString('missing'),
         ]));
 
-        $result = (new ExistsCommand())->handle($command, $store, $this->createConnection());
+        $result = new ExistsCommand()->handle($command, $store, $this->createConnection());
 
         self::assertSame(2, $result->value);
     }
@@ -36,7 +36,7 @@ final class ExistsCommandTest extends TestCase
     {
         $command = Command::fromRespValue(RespValue::array([RespValue::bulkString('EXISTS')]));
 
-        $result = (new ExistsCommand())->handle($command, new InMemoryStore(), $this->createConnection());
+        $result = new ExistsCommand()->handle($command, new InMemoryStore(), $this->createConnection());
 
         self::assertSame(RespType::Error, $result->type);
     }

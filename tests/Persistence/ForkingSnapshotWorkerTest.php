@@ -46,7 +46,7 @@ final class ForkingSnapshotWorkerTest extends TestCase
         $this->waitForSnapshot();
 
         $reloaded = new InMemoryStore();
-        (new SnapshotStore($this->path))->load($reloaded);
+        new SnapshotStore($this->path)->load($reloaded);
 
         self::assertSame('Tanat', $reloaded->get('name'));
     }

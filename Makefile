@@ -1,5 +1,4 @@
-.PHONY: up down shell build install test analyse \
-        run-server run-server-debug run-client run-client-debug bench example
+.PHONY: up down shell build install test analyse format format-check run-server run-server-debug run-client run-client-debug bench example
 
 up:
 	docker compose up -d
@@ -49,3 +48,9 @@ bench: up
 # make example NAME=ttl  (also: pipelining, pubsub, slow-client)
 example: up
 	docker compose exec php php examples/$(NAME).php
+
+format: up
+	docker compose exec php composer format
+
+format-check: up
+	docker compose exec php composer format:check

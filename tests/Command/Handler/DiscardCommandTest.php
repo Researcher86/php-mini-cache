@@ -25,7 +25,7 @@ final class DiscardCommandTest extends TestCase
         $transactions->queue($connection, Command::fromRespValue(RespValue::array([RespValue::bulkString('PING')])));
         $command = Command::fromRespValue(RespValue::array([RespValue::bulkString('DISCARD')]));
 
-        $result = (new DiscardCommand($transactions))->handle($command, new InMemoryStore(), $connection);
+        $result = new DiscardCommand($transactions)->handle($command, new InMemoryStore(), $connection);
 
         self::assertSame('OK', $result->value);
         self::assertFalse($transactions->isActive($connection));
@@ -36,7 +36,7 @@ final class DiscardCommandTest extends TestCase
         $transactions = new TransactionManager();
         $command = Command::fromRespValue(RespValue::array([RespValue::bulkString('DISCARD')]));
 
-        $result = (new DiscardCommand($transactions))->handle($command, new InMemoryStore(), $this->createConnection());
+        $result = new DiscardCommand($transactions)->handle($command, new InMemoryStore(), $this->createConnection());
 
         self::assertSame(RespType::Error, $result->type);
     }

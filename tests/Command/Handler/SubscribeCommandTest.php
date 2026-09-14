@@ -26,7 +26,7 @@ final class SubscribeCommandTest extends TestCase
             RespValue::bulkString('news'),
         ]));
 
-        $result = (new SubscribeCommand($registry))->handle($command, new InMemoryStore(), $connection);
+        $result = new SubscribeCommand($registry)->handle($command, new InMemoryStore(), $connection);
 
         self::assertSame(RespType::Array, $result->type);
         self::assertSame('subscribe', $result->value[0]->value);
@@ -39,7 +39,7 @@ final class SubscribeCommandTest extends TestCase
     {
         $command = Command::fromRespValue(RespValue::array([RespValue::bulkString('SUBSCRIBE')]));
 
-        $result = (new SubscribeCommand(new ChannelRegistry()))
+        $result = new SubscribeCommand(new ChannelRegistry())
             ->handle($command, new InMemoryStore(), $this->createConnection());
 
         self::assertSame(RespType::Error, $result->type);

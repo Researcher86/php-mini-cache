@@ -25,7 +25,7 @@ final class GetCommandTest extends TestCase
             RespValue::bulkString('name'),
         ]));
 
-        $result = (new GetCommand())->handle($command, $store, $this->createConnection());
+        $result = new GetCommand()->handle($command, $store, $this->createConnection());
 
         self::assertSame('Tanat', $result->value);
     }
@@ -37,7 +37,7 @@ final class GetCommandTest extends TestCase
             RespValue::bulkString('missing'),
         ]));
 
-        $result = (new GetCommand())->handle($command, new InMemoryStore(), $this->createConnection());
+        $result = new GetCommand()->handle($command, new InMemoryStore(), $this->createConnection());
 
         self::assertNull($result->value);
     }
@@ -46,7 +46,7 @@ final class GetCommandTest extends TestCase
     {
         $command = Command::fromRespValue(RespValue::array([RespValue::bulkString('GET')]));
 
-        $result = (new GetCommand())->handle($command, new InMemoryStore(), $this->createConnection());
+        $result = new GetCommand()->handle($command, new InMemoryStore(), $this->createConnection());
 
         self::assertSame(RespType::Error, $result->type);
     }

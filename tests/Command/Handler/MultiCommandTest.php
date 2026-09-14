@@ -23,7 +23,7 @@ final class MultiCommandTest extends TestCase
         $connection = $this->createConnection();
         $command = Command::fromRespValue(RespValue::array([RespValue::bulkString('MULTI')]));
 
-        $result = (new MultiCommand($transactions))->handle($command, new InMemoryStore(), $connection);
+        $result = new MultiCommand($transactions)->handle($command, new InMemoryStore(), $connection);
 
         self::assertSame('OK', $result->value);
         self::assertTrue($transactions->isActive($connection));
@@ -36,7 +36,7 @@ final class MultiCommandTest extends TestCase
         $transactions->begin($connection);
         $command = Command::fromRespValue(RespValue::array([RespValue::bulkString('MULTI')]));
 
-        $result = (new MultiCommand($transactions))->handle($command, new InMemoryStore(), $connection);
+        $result = new MultiCommand($transactions)->handle($command, new InMemoryStore(), $connection);
 
         self::assertSame(RespType::Error, $result->type);
     }

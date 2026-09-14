@@ -24,7 +24,7 @@ final class RespParserFuzzTest extends TestCase
     #[DataProvider('needsMoreBytesProvider')]
     public function testNeedsMoreBytes(string $buffer): void
     {
-        self::assertNull((new RespParser())->parse($buffer));
+        self::assertNull(new RespParser()->parse($buffer));
     }
 
     #[DataProvider('invalidProvider')]
@@ -32,13 +32,13 @@ final class RespParserFuzzTest extends TestCase
     {
         $this->expectException(ProtocolException::class);
 
-        (new RespParser())->parse($buffer);
+        new RespParser()->parse($buffer);
     }
 
     #[DataProvider('validProvider')]
     public function testValidInputStillParses(string $buffer): void
     {
-        self::assertNotNull((new RespParser())->parse($buffer));
+        self::assertNotNull(new RespParser()->parse($buffer));
     }
 
     /**

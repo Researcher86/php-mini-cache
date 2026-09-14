@@ -839,7 +839,7 @@ final class RedisServerTest extends TestCase
             $loop->tick(0.1);
 
             $reloaded = new InMemoryStore();
-            (new SnapshotStore($path))->load($reloaded);
+            new SnapshotStore($path)->load($reloaded);
 
             self::assertSame('value', $reloaded->get('written-since-the-last-snapshot'));
         } finally {
@@ -890,7 +890,7 @@ final class RedisServerTest extends TestCase
             }
 
             $reloaded = new InMemoryStore();
-            (new SnapshotStore($path))->load($reloaded);
+            new SnapshotStore($path)->load($reloaded);
 
             self::assertSame('newer', $reloaded->get('written-after-the-fork'));
         } finally {

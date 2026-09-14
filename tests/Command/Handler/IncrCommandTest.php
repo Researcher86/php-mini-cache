@@ -25,7 +25,7 @@ final class IncrCommandTest extends TestCase
             RespValue::bulkString('counter'),
         ]));
 
-        $result = (new IncrCommand())->handle($command, $store, $this->createConnection());
+        $result = new IncrCommand()->handle($command, $store, $this->createConnection());
 
         self::assertSame(1, $result->value);
         self::assertSame('1', $store->get('counter'));
@@ -40,7 +40,7 @@ final class IncrCommandTest extends TestCase
             RespValue::bulkString('counter'),
         ]));
 
-        $result = (new IncrCommand())->handle($command, $store, $this->createConnection());
+        $result = new IncrCommand()->handle($command, $store, $this->createConnection());
 
         self::assertSame(42, $result->value);
         self::assertSame('42', $store->get('counter'));
@@ -57,7 +57,7 @@ final class IncrCommandTest extends TestCase
             RespValue::bulkString('hits'),
         ]));
 
-        (new IncrCommand())->handle($command, $store, $this->createConnection());
+        new IncrCommand()->handle($command, $store, $this->createConnection());
 
         $clock->advance(59);
         self::assertSame('2', $store->get('hits'));
@@ -76,7 +76,7 @@ final class IncrCommandTest extends TestCase
             RespValue::bulkString('name'),
         ]));
 
-        $result = (new IncrCommand())->handle($command, $store, $this->createConnection());
+        $result = new IncrCommand()->handle($command, $store, $this->createConnection());
 
         self::assertSame(RespType::Error, $result->type);
     }
@@ -90,7 +90,7 @@ final class IncrCommandTest extends TestCase
             RespValue::bulkString('counter'),
         ]));
 
-        $result = (new IncrCommand())->handle($command, $store, $this->createConnection());
+        $result = new IncrCommand()->handle($command, $store, $this->createConnection());
 
         self::assertSame(RespType::Error, $result->type);
         self::assertSame('ERR value is not an integer or out of range', $result->value);
@@ -105,7 +105,7 @@ final class IncrCommandTest extends TestCase
             RespValue::bulkString('counter'),
         ]));
 
-        $result = (new IncrCommand())->handle($command, $store, $this->createConnection());
+        $result = new IncrCommand()->handle($command, $store, $this->createConnection());
 
         self::assertSame(RespType::Error, $result->type);
         self::assertSame('ERR increment or decrement would overflow', $result->value);

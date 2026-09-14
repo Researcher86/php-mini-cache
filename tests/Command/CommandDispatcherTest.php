@@ -22,7 +22,7 @@ final class CommandDispatcherTest extends TestCase
     public function testRoutesACommandToItsRegisteredHandler(): void
     {
         $dispatcher = new CommandDispatcher();
-        $dispatcher->register('PING', new class implements CommandHandler {
+        $dispatcher->register('PING', new class () implements CommandHandler {
             public function handle(Command $command, Store $store, ClientConnection $connection): RespValue
             {
                 return RespValue::simpleString('PONG');
@@ -37,7 +37,7 @@ final class CommandDispatcherTest extends TestCase
     public function testRoutingIsCaseInsensitive(): void
     {
         $dispatcher = new CommandDispatcher();
-        $dispatcher->register('ping', new class implements CommandHandler {
+        $dispatcher->register('ping', new class () implements CommandHandler {
             public function handle(Command $command, Store $store, ClientConnection $connection): RespValue
             {
                 return RespValue::simpleString('PONG');

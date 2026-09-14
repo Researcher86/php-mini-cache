@@ -101,10 +101,10 @@ final class SnapshotStoreTest extends TestCase
         file_put_contents($foreignTmp, 'half a snapshot');
 
         try {
-            (new SnapshotStore($this->path))->save($store);
+            new SnapshotStore($this->path)->save($store);
 
             $reloaded = new InMemoryStore();
-            (new SnapshotStore($this->path))->load($reloaded);
+            new SnapshotStore($this->path)->load($reloaded);
 
             self::assertSame('Tanat', $reloaded->get('name'));
             self::assertSame('half a snapshot', file_get_contents($foreignTmp));

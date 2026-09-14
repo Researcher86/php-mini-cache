@@ -37,7 +37,7 @@ final class InfoCommandTest extends TestCase
         $connections = new ConnectionManager();
         $command = Command::fromRespValue(RespValue::array([RespValue::bulkString('INFO')]));
 
-        $result = (new InfoCommand($metrics, $connections, $eventLoop))->handle($command, new InMemoryStore(), $this->createConnection());
+        $result = new InfoCommand($metrics, $connections, $eventLoop)->handle($command, new InMemoryStore(), $this->createConnection());
 
         self::assertSame(RespType::BulkString, $result->type);
         self::assertStringContainsString('connected_clients:0', $result->value);
@@ -61,7 +61,7 @@ final class InfoCommandTest extends TestCase
         $connections->add($this->createConnection());
 
         $command = Command::fromRespValue(RespValue::array([RespValue::bulkString('INFO')]));
-        $result = (new InfoCommand(new ServerMetrics(), $connections, new EventLoopMetrics()))
+        $result = new InfoCommand(new ServerMetrics(), $connections, new EventLoopMetrics())
             ->handle($command, new InMemoryStore(), $this->createConnection());
 
         self::assertStringContainsString('connected_clients:2', $result->value);

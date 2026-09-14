@@ -1620,7 +1620,24 @@ everything above talks to the server with.
 
 # Related Projects
 
-This project is part of a collection of educational PHP backend and concurrency projects.
+This project is part of [**php-systems-lab**](https://github.com/Researcher86/php-systems-lab),
+a collection of educational PHP backend and concurrency projects.
+
+## [PHP Memory Lab](https://github.com/Researcher86/php-memory-lab)
+
+Memory and operating-system fundamentals, measured rather than asserted.
+
+It focuses on:
+
+* `memory_get_usage()` against RSS, and why they disagree;
+* what arrays, strings and objects actually cost;
+* `fork()` and Copy-on-Write, quantified with PSS;
+* shared memory, `mmap` and FFI - memory PHP's counters cannot see.
+
+Directly relevant here: a cache is a process whose whole job is to hold data
+in memory, and `php-memory-lab` is where the cost of holding it is measured.
+An entry that reports 200 bytes to `memory_get_usage()` does not move RSS by
+200 bytes, and the gap is what decides how large this server can grow.
 
 ## [PHP Concurrency](https://github.com/Researcher86/php-concurrency)
 

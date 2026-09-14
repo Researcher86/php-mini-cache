@@ -42,7 +42,7 @@ final class RedisClientTest extends TestCase
             // and nothing here installs a handler for it.
             pcntl_alarm(15);
 
-            (new RedisServer(new ServerConfig(host: self::HOST, port: $this->port)))->run();
+            new RedisServer(new ServerConfig(host: self::HOST, port: $this->port))->run();
 
             // Never return into PHPUnit: the child would go on to run the
             // rest of the suite as a second test runner.
