@@ -5,15 +5,15 @@ declare(strict_types=1);
 
 use PhpMiniCache\Protocol\RespType;
 use PhpMiniCache\Protocol\RespValue;
+use PhpMiniCache\Sdk\CacheClient;
+use PhpMiniCache\Sdk\CacheClientException;
 use PhpMiniCache\Sdk\CommandFailedException;
-use PhpMiniCache\Sdk\RedisClient;
-use PhpMiniCache\Sdk\RedisClientException;
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
 /**
  * Turns a reply into the one line a terminal wants, which is the only part
- * of this script that is not RedisClient doing the work.
+ * of this script that is not CacheClient doing the work.
  */
 function describe(RespValue $value): string
 {
@@ -33,20 +33,20 @@ if ($arguments === []) {
     $arguments = ['PING'];
 }
 
-$client = new RedisClient(
-    getenv('REDIS_HOST') ?: '127.0.0.1',
-    (int) (getenv('REDIS_PORT') ?: 6380),
+$client = new CacheClient(
+    getenv('CACHE_HOST') ?: '127.0.0.1',
+    (int) (getenv('CACHE_PORT') ?: 6380),
 );
 
 try {
     fwrite(STDOUT, describe($client->command(...$arguments)) . "\n");
 } catch (CommandFailedException $exception) {
-    // The server answered, and said no - reported the way redis-cli does,
+    // The server answered, and said no - reported the way the reference CLI does,
     // rather than as this script failing.
     fwrite(STDOUT, 'ERROR: ' . $exception->error . "\n");
 
     exit(1);
-} catch (RedisClientException $exception) {
+} catch (CacheClientException $exception) {
     fwrite(STDERR, $exception->getMessage() . "\n");
 
     exit(1);

@@ -10,6 +10,6 @@ namespace PhpMiniCache\Sdk;
  * subscriber falls too far behind - so this is a normal, expected outcome,
  * not necessarily a broken network.
  */
-final class ConnectionLostException extends RedisClientException
+final class ConnectionLostException extends CacheClientException
 {
 }

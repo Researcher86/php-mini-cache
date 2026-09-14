@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PhpMiniCache\Protocol;
 
 /**
- * One value of the Redis Serialization Protocol: a simple string, an
+ * One value of the RESP wire protocol: a simple string, an
  * error, an integer, a bulk string (or null), or an array of values
  * (or null).
  */

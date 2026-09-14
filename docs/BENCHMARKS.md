@@ -7,7 +7,7 @@ instead of a guess.
 
 `bin/bench.php` forks `--clients` child processes (via `pcntl_fork()` -
 the same primitive the rest of this codebase's forked-worker phases are
-built on), each opening one `RedisClient` connection and running
+built on), each opening one `CacheClient` connection and running
 `--requests` synchronous request/reply round trips against it: send, wait
 for the reply, send the next. Every child times its own round trips and writes
 them to a temp file; the parent waits for every child to exit, aggregates
@@ -140,7 +140,7 @@ both are worth knowing about because neither is visible in a profile:
   100 did 100k: a batch that large arrives in several reads, so it is
   answered in several writes, and Nagle held every write after the first
   for a delayed ACK's worth of time - a stable 47 ms per batch. Both ends
-  now set `tcp_nodelay`, the way real Redis does.
+  now set `tcp_nodelay`, the way the reference implementation does.
 
 ### Pub/Sub fan-out
 

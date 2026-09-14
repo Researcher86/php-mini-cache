@@ -4,7 +4,7 @@
 
 `php-mini-cache` is a small educational project for exploring how an event-driven in-memory database server works internally.
 
-The goal is not to replace Redis.
+The goal is not to become a production database.
 
 The goal is to build a simplified server that exposes the fundamental ideas behind systems such as:
 
@@ -46,15 +46,15 @@ make run-client ARGS="GET name"
 
 `bin/client.php` is a one-shot wrapper around the client class below: one
 command per invocation, the reply printed to stdout. It exists to make
-this demo runnable without `redis-cli`.
+this demo runnable without any external CLI tool.
 
 ## Talking to it from PHP
 
-`RedisClient` is the client this project ships - a plain PHP object,
+`CacheClient` is the client this project ships - a plain PHP object,
 usable from a CLI script, a PHP-FPM request or a cron job:
 
 ```php
-$client = new RedisClient('127.0.0.1', 6380);
+$client = new CacheClient('127.0.0.1', 6380);
 
 $client->set('name', 'Tanat', ttlSeconds: 60);
 $client->get('name');                  // 'Tanat'
@@ -65,7 +65,7 @@ $client->command('INFO');              // anything without a method of its own
 Failures are exceptions rather than values to remember to check: a
 `-ERR ...` reply raises `CommandFailedException`, a dropped connection
 `ConnectionLostException`, a server that stops answering
-`ReplyTimedOutException` - all under one `RedisClientException` for
+`ReplyTimedOutException` - all under one `CacheClientException` for
 callers that only care that it did not work.
 
 Two things stay explicit, because hiding them would hide the mechanism
@@ -90,7 +90,7 @@ Pub/Sub is a subscription plus a blocking read, with silence reported as
 `null` rather than as a failure:
 
 ```php
-$subscriber = new RedisClient();
+$subscriber = new CacheClient();
 $subscriber->subscribe('news');
 
 while ($message = $subscriber->nextMessage(timeoutSeconds: 30)) {
@@ -129,7 +129,7 @@ make example NAME=slow-client            # a paused slow reader vs. an unaffecte
 | **Limits** | capped read buffer size, arguments per command, and connection count - each replies with a RESP error instead of growing unbounded |
 | **Backpressure** | a slow reader's write buffer is capped - reading from it pauses until it drains, instead of growing unbounded; a subscriber that never reads is dropped, since pausing its reads cannot slow a publisher down |
 | **Metrics** | `INFO` reports connections, commands (overall, per name, and unknown), bytes in/out, errors, expired keys |
-| **Client** | `RedisClient` - typed commands, pipelining, transactions, Pub/Sub, timeouts, errors as exceptions |
+| **Client** | `CacheClient` - typed commands, pipelining, transactions, Pub/Sub, timeouts, errors as exceptions |
 
 Every phase in [docs/PHASES.md](docs/PHASES.md) is done - the tests, the
 measured benchmarks, and the standalone `examples/` scripts included -
@@ -154,7 +154,7 @@ quietly disappearing.
 
 # Why?
 
-Redis looks deceptively simple from the client side.
+A cache server looks deceptively simple from the client side.
 
 You connect:
 
@@ -393,7 +393,7 @@ separation (Networking → Protocol → Commands → State).
 php-mini-cache/
 │
 ├── bin/
-│   ├── server.php              # entry point: RedisServer::run()
+│   ├── server.php              # entry point: CacheServer::run()
 │   ├── client.php              # one-shot RESP client, for the demo above
 │   └── bench.php               # throughput/latency benchmark - docs/BENCHMARKS.md
 │
@@ -408,7 +408,7 @@ php-mini-cache/
 ├── src/
 │   │
 │   ├── Server/
-│   │   ├── RedisServer.php      # wires every layer below together
+│   │   ├── CacheServer.php      # wires every layer below together
 │   │   ├── ServerConfig.php
 │   │   └── ServerSocket.php
 │   │
@@ -462,9 +462,9 @@ php-mini-cache/
 │   │   └── ServerMetrics.php
 │   │
 │   ├── Sdk/
-│   │   ├── RedisClient.php      # the client the demos and benchmarks use
+│   │   ├── CacheClient.php      # the client the demos and benchmarks use
 │   │   ├── PubSubMessage.php
-│   │   └── RedisClientException.php + one per failure mode
+│   │   └── CacheClientException.php + one per failure mode
 │   │
 │   ├── Support/
 │   │   ├── Clock.php
@@ -660,7 +660,7 @@ READ AGAIN
 
 # RESP Protocol
 
-The server uses a simplified version of the Redis Serialization Protocol.
+The server speaks the RESP wire protocol - a plain-text framing for commands and replies.
 
 A client sends commands.
 
@@ -867,7 +867,7 @@ INFO
 
 Replies with one bulk string of `key:value` lines - connections,
 commands processed overall and by name, unknown commands, bytes
-read/written, errors, expired keys. Matches real Redis's own `INFO` reply shape, though only a
+read/written, errors, expired keys. The reply shape mirrors a full `INFO` output, though only a
 small subset of what it actually reports.
 
 ---
@@ -1716,7 +1716,7 @@ Each project focuses on a different engineering problem while remaining small en
 
 # What This Project Is Not
 
-This project is intentionally **not** trying to become Redis.
+This project is intentionally **not** trying to become a production-grade cache server.
 
 A production-grade server includes many additional concerns:
 
@@ -1819,7 +1819,7 @@ The entire server can be reduced to:
 
 # Final Principle
 
-The purpose of this project is not to build a Redis replacement.
+The purpose of this project is not to build a production cache.
 
 The purpose is to build an:
 

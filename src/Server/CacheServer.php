@@ -43,7 +43,7 @@ use PhpMiniCache\Transaction\TransactionManager;
  * A timer periodically sweeps expired keys from the Store (active
  * expiration), on top of the Store's own lazy expiration on access.
  */
-final class RedisServer
+final class CacheServer
 {
     private const int READ_CHUNK_SIZE = 65536;
 
@@ -495,7 +495,7 @@ final class RedisServer
         // is no reliable way to find the start of the next value once
         // framing is lost. Everything that arrived before the bad byte
         // has already been applied in order above; the client still gets
-        // a proper RESP error, the same as real Redis, before the
+        // a proper RESP error before the
         // connection closes.
         $this->sendErrorAndDisconnect($connection, 'ERR Protocol error: ' . $error->getMessage());
     }
@@ -653,9 +653,9 @@ final class RedisServer
      * ran out of memory - with backpressure "working" the whole time,
      * since its own reads have been paused since the first megabyte.
      *
-     * Past the hard limit it is dropped instead. Real Redis draws the line
-     * in the same place and for the same reason (its
-     * `client-output-buffer-limit pubsub`), while leaving ordinary clients
+     * Past the hard limit it is dropped instead. The same line is drawn
+     * for the same reason (the reference `client-output-buffer-limit pubsub`
+     * setting), while leaving ordinary clients
      * unlimited: what those queue is bounded by what they asked for.
      */
     private function deliverToSubscriber(ClientConnection $subscriber, string $payload): void

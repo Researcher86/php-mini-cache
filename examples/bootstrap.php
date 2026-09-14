@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-use PhpMiniCache\Sdk\RedisClient;
-use PhpMiniCache\Sdk\RedisClientException;
+use PhpMiniCache\Sdk\CacheClient;
+use PhpMiniCache\Sdk\CacheClientException;
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
@@ -14,17 +14,17 @@ require dirname(__DIR__) . '/vendor/autoload.php';
  * turns "nothing is listening on 6380" into the sentence that actually
  * helps, instead of a stack trace from the middle of the demo.
  */
-function exampleClient(float $timeoutSeconds = 5.0): RedisClient
+function exampleClient(float $timeoutSeconds = 5.0): CacheClient
 {
-    $client = new RedisClient(
-        getenv('REDIS_HOST') ?: '127.0.0.1',
-        (int) (getenv('REDIS_PORT') ?: 6380),
+    $client = new CacheClient(
+        getenv('CACHE_HOST') ?: '127.0.0.1',
+        (int) (getenv('CACHE_PORT') ?: 6380),
         $timeoutSeconds,
     );
 
     try {
         $client->ping();
-    } catch (RedisClientException $exception) {
+    } catch (CacheClientException $exception) {
         fwrite(STDERR, $exception->getMessage() . " - is `make run-server` running?\n");
 
         exit(1);

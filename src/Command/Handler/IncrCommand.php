@@ -27,7 +27,7 @@ final readonly class IncrCommand implements CommandHandler
 
             // (int) silently clamps out-of-range digits to PHP_INT_MAX /
             // PHP_INT_MIN, so compare back: a value that does not survive
-            // the round-trip is out of range, same rule as real Redis.
+            // the round-trip is out of range - rejected the same way.
             if ((string) $number !== $current) {
                 return RespValue::error('ERR value is not an integer or out of range');
             }
@@ -43,7 +43,7 @@ final readonly class IncrCommand implements CommandHandler
 
         // Rewriting the value must not extend the key's life: a counter set
         // with a TTL stays on that TTL as it is incremented, as it does in
-        // real Redis. A key that is not there yet is written as a new one,
+        // with no expiration. A key that is not there yet is written as a new one,
         // with no expiration.
         if (!$store->setKeepingTtl($command->arguments[0], (string) $number)) {
             $store->set($command->arguments[0], (string) $number);

@@ -1,4 +1,4 @@
-# PHP Mini Redis Architecture
+# PHP Mini Cache Architecture
 
 > Architecture and internal data flow of an educational event-driven in-memory database server written in PHP.
 
@@ -1246,7 +1246,7 @@ Restore State
 
 | Component                     | Responsibility                               |
 | ----------------------------- | --------------------------------------------- |
-| `RedisServer`                 | Server lifecycle and component wiring          |
+| `CacheServer`                 | Server lifecycle and component wiring          |
 | `ServerSocket`                | Accept new TCP connections                     |
 | `EventLoop` / `SelectLoop`    | Wait for readable/writable streams and timers   |
 | `Timer` / `TimerManager`      | Scheduled callbacks (TTL sweep, idle timeout)   |
@@ -1544,7 +1544,7 @@ How do keys expire?
 # Summary
 
 ```text
-PHP Mini Redis
+PHP Mini Cache
 
 =
 
@@ -1571,7 +1571,7 @@ Pub/Sub
 Persistence
 ```
 
-The project is not intended to compete with Redis.
+The project is not intended to compete with production cache servers.
 
 Its purpose is simpler:
 

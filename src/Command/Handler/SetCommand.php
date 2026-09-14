@@ -36,7 +36,7 @@ final readonly class SetCommand implements CommandHandler
             // number too large to survive the cast (which silently clamps to
             // PHP_INT_MAX). Storing a key that is already expired the moment
             // it is written answers +OK for a write nothing can ever read -
-            // real Redis refuses the same way.
+            // the server refuses the same way.
             if ($seconds <= 0 || (string) $seconds !== $ttl) {
                 return RespValue::error("ERR invalid expire time in 'set' command");
             }

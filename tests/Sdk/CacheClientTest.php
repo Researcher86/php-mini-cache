@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace PhpMiniCache\Tests\Sdk;
 
 use PhpMiniCache\Protocol\RespType;
+use PhpMiniCache\Sdk\CacheClient;
+use PhpMiniCache\Sdk\CacheClientException;
 use PhpMiniCache\Sdk\CommandFailedException;
 use PhpMiniCache\Sdk\ConnectionFailedException;
-use PhpMiniCache\Sdk\RedisClient;
-use PhpMiniCache\Sdk\RedisClientException;
-use PhpMiniCache\Server\RedisServer;
+use PhpMiniCache\Server\CacheServer;
 use PhpMiniCache\Server\ServerConfig;
 use PhpMiniCache\Tests\Support\FreePort;
 use PHPUnit\Framework\TestCase;
@@ -20,13 +20,13 @@ use PHPUnit\Framework\TestCase;
  * it runs in a forked child, started fresh for each test and stopped again
  * in tearDown().
  */
-final class RedisClientTest extends TestCase
+final class CacheClientTest extends TestCase
 {
     private const string HOST = '127.0.0.1';
 
     private int $port = 0;
     private int $serverPid = 0;
-    private RedisClient $client;
+    private CacheClient $client;
 
     protected function setUp(): void
     {
@@ -42,7 +42,7 @@ final class RedisClientTest extends TestCase
             // and nothing here installs a handler for it.
             pcntl_alarm(15);
 
-            new RedisServer(new ServerConfig(host: self::HOST, port: $this->port))->run();
+            new CacheServer(new ServerConfig(host: self::HOST, port: $this->port))->run();
 
             // Never return into PHPUnit: the child would go on to run the
             // rest of the suite as a second test runner.
@@ -230,7 +230,7 @@ final class RedisClientTest extends TestCase
 
     public function testConnectingToAPortNothingListensOnFails(): void
     {
-        $client = new RedisClient(self::HOST, 1, timeoutSeconds: 0.5);
+        $client = new CacheClient(self::HOST, 1, timeoutSeconds: 0.5);
 
         $this->expectException(ConnectionFailedException::class);
 
@@ -259,7 +259,7 @@ final class RedisClientTest extends TestCase
                 $this->client->ping();
 
                 return;
-            } catch (RedisClientException) {
+            } catch (CacheClientException) {
                 usleep(20_000);
             }
         }
@@ -267,8 +267,8 @@ final class RedisClientTest extends TestCase
         self::fail('The forked server never started listening.');
     }
 
-    private function newClient(): RedisClient
+    private function newClient(): CacheClient
     {
-        return new RedisClient(self::HOST, $this->port, timeoutSeconds: 2.0);
+        return new CacheClient(self::HOST, $this->port, timeoutSeconds: 2.0);
     }
 }

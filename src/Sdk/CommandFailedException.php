@@ -11,7 +11,7 @@ namespace PhpMiniCache\Sdk;
  * string, and a caller that did not think to inspect every reply would
  * treat "the server refused" as data.
  */
-final class CommandFailedException extends RedisClientException
+final class CommandFailedException extends CacheClientException
 {
     public function __construct(
         public readonly string $error,

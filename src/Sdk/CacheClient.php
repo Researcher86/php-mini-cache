@@ -16,7 +16,7 @@ use PhpMiniCache\Protocol\RespValue;
  *
  * The commands the server implements are here as named methods:
  *
- *     $client = new RedisClient();
+ *     $client = new CacheClient();
  *     $client->set('name', 'Tanat', ttlSeconds: 60);
  *     $client->get('name');            // 'Tanat'
  *     $client->increment('hits');      // 1
@@ -39,7 +39,7 @@ use PhpMiniCache\Protocol\RespValue;
  * write or a closed socket surfaces as an exception rather than a silently
  * dropped command.
  */
-final class RedisClient
+final class CacheClient
 {
     /** @var resource|null */
     private mixed $socket = null;
@@ -65,7 +65,7 @@ final class RedisClient
     ) {
     }
 
-    /** @throws RedisClientException */
+    /** @throws CacheClientException */
     public function ping(?string $message = null): string
     {
         $reply = $message === null
@@ -75,7 +75,7 @@ final class RedisClient
         return (string) $reply->value;
     }
 
-    /** @throws RedisClientException */
+    /** @throws CacheClientException */
     public function set(string $key, string $value, ?int $ttlSeconds = null): void
     {
         $ttlSeconds === null
@@ -87,7 +87,7 @@ final class RedisClient
      * Null means the key is not there - or expired, which the server
      * reports as the same thing.
      *
-     * @throws RedisClientException
+     * @throws CacheClientException
      */
     public function get(string $key): ?string
     {
@@ -99,7 +99,7 @@ final class RedisClient
     /**
      * @return int how many of $keys existed and were removed
      *
-     * @throws RedisClientException
+     * @throws CacheClientException
      */
     public function delete(string $key, string ...$more): int
     {
@@ -109,20 +109,20 @@ final class RedisClient
     /**
      * @return int how many of $keys exist
      *
-     * @throws RedisClientException
+     * @throws CacheClientException
      */
     public function exists(string $key, string ...$more): int
     {
         return (int) $this->command('EXISTS', $key, ...$more)->value;
     }
 
-    /** @throws RedisClientException */
+    /** @throws CacheClientException */
     public function increment(string $key): int
     {
         return (int) $this->command('INCR', $key)->value;
     }
 
-    /** @throws RedisClientException */
+    /** @throws CacheClientException */
     public function info(): string
     {
         return (string) $this->command('INFO')->value;
@@ -131,7 +131,7 @@ final class RedisClient
     /**
      * @return int how many subscribers the message reached
      *
-     * @throws RedisClientException
+     * @throws CacheClientException
      */
     public function publish(string $channel, string $message): int
     {
@@ -142,7 +142,7 @@ final class RedisClient
      * Subscribes this connection to $channel and returns how many channels
      * it is now subscribed to. Messages arrive through nextMessage().
      *
-     * @throws RedisClientException
+     * @throws CacheClientException
      */
     public function subscribe(string $channel): int
     {
@@ -158,7 +158,7 @@ final class RedisClient
      * default). Null means nothing arrived in time - which is an answer, not
      * a failure, so unlike every other read here it does not throw.
      *
-     * @throws RedisClientException
+     * @throws CacheClientException
      */
     public function nextMessage(?float $timeoutSeconds = null): ?PubSubMessage
     {
@@ -182,7 +182,7 @@ final class RedisClient
      * Starts a transaction: from here until exec() or discard(), commands
      * sent with queue() are held by the server instead of run.
      *
-     * @throws RedisClientException
+     * @throws CacheClientException
      */
     public function multi(): void
     {
@@ -194,7 +194,7 @@ final class RedisClient
      * Adds one command to the open transaction. The server replies
      * `+QUEUED`; the actual result arrives in exec()'s array.
      *
-     * @throws RedisClientException
+     * @throws CacheClientException
      */
     public function queue(string $name, string ...$arguments): void
     {
@@ -209,7 +209,7 @@ final class RedisClient
      *
      * @return list<RespValue>
      *
-     * @throws RedisClientException
+     * @throws CacheClientException
      */
     public function exec(): array
     {
@@ -219,7 +219,7 @@ final class RedisClient
         return is_array($reply->value) ? $reply->value : [];
     }
 
-    /** @throws RedisClientException */
+    /** @throws CacheClientException */
     public function discard(): void
     {
         $this->command('DISCARD');
@@ -235,7 +235,7 @@ final class RedisClient
      * Sends one command and returns its reply, raising a
      * CommandFailedException if the server answered with an error.
      *
-     * @throws RedisClientException
+     * @throws CacheClientException
      */
     public function command(string $name, string ...$arguments): RespValue
     {
@@ -262,7 +262,7 @@ final class RedisClient
      *
      * @return list<RespValue> one reply per command, in order
      *
-     * @throws RedisClientException
+     * @throws CacheClientException
      */
     public function pipeline(array $commands): array
     {
@@ -298,7 +298,7 @@ final class RedisClient
      * read the earlier replies as answers to the later ones. Use it on a
      * connection doing nothing else.
      *
-     * @throws RedisClientException
+     * @throws CacheClientException
      */
     public function sendWithoutReading(string $name, string ...$arguments): void
     {
@@ -316,7 +316,7 @@ final class RedisClient
         $this->inTransaction = false;
     }
 
-    /** @throws RedisClientException */
+    /** @throws CacheClientException */
     private function writeCommand(string $name, string ...$arguments): void
     {
         $this->write($this->encode([$name, ...$arguments]));
@@ -335,7 +335,7 @@ final class RedisClient
      * non-blocking, so a large batch is written in whatever slices the
      * kernel's send buffer has room for, waiting for it to drain in between.
      *
-     * @throws RedisClientException
+     * @throws CacheClientException
      */
     private function write(string $bytes): void
     {
@@ -363,7 +363,7 @@ final class RedisClient
      * Returns the next complete reply, reading more bytes only when the
      * ones already buffered do not hold one.
      *
-     * @throws RedisClientException
+     * @throws CacheClientException
      */
     private function readReply(float $deadline): RespValue
     {
@@ -389,7 +389,7 @@ final class RedisClient
         }
     }
 
-    /** @throws RedisClientException */
+    /** @throws CacheClientException */
     private function readChunk(float $deadline): string
     {
         $socket = $this->connection();

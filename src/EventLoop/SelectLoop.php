@@ -134,7 +134,7 @@ final class SelectLoop implements EventLoop
      * stream_select() is handed one and raises a TypeError that takes the
      * whole process down.
      *
-     * The loop does not own what it watches: RedisServer closes every
+     * The loop does not own what it watches: CacheServer closes every
      * connection at once on shutdown, a connection is dropped from inside
      * a listener, a test closes a socket it made itself. Requiring each of
      * them to deregister first - on every path, including the ones that

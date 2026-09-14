@@ -8,18 +8,18 @@ use PhpMiniCache\Connection\ClientConnection;
 use PhpMiniCache\Connection\ConnectionState;
 use PhpMiniCache\EventLoop\SelectLoop;
 use PhpMiniCache\Persistence\SnapshotStore;
-use PhpMiniCache\Server\RedisServer;
+use PhpMiniCache\Server\CacheServer;
 use PhpMiniCache\Server\ServerConfig;
 use PhpMiniCache\Storage\InMemoryStore;
 use PhpMiniCache\Tests\Support\FakeClock;
 use PHPUnit\Framework\TestCase;
 use ReflectionProperty;
 
-final class RedisServerTest extends TestCase
+final class CacheServerTest extends TestCase
 {
     public function testItAcceptsAConnectingClient(): void
     {
-        $server = new RedisServer(new ServerConfig(host: '127.0.0.1', port: 0));
+        $server = new CacheServer(new ServerConfig(host: '127.0.0.1', port: 0));
 
         try {
             self::assertSame(0, $server->connectedClientCount());
@@ -40,7 +40,7 @@ final class RedisServerTest extends TestCase
 
     public function testAcceptedSocketIsNonBlocking(): void
     {
-        $server = new RedisServer(new ServerConfig(host: '127.0.0.1', port: 0));
+        $server = new CacheServer(new ServerConfig(host: '127.0.0.1', port: 0));
 
         try {
             $client = @stream_socket_client('tcp://' . $server->localAddress(), $errno, $errstr, 5);
@@ -63,7 +63,7 @@ final class RedisServerTest extends TestCase
 
     public function testAcceptTimesOutWithoutAClient(): void
     {
-        $server = new RedisServer(new ServerConfig(host: '127.0.0.1', port: 0));
+        $server = new CacheServer(new ServerConfig(host: '127.0.0.1', port: 0));
 
         try {
             self::assertNull($server->acceptClient(0.1));
@@ -75,7 +75,7 @@ final class RedisServerTest extends TestCase
 
     public function testStopClosesTrackedConnections(): void
     {
-        $server = new RedisServer(new ServerConfig(host: '127.0.0.1', port: 0));
+        $server = new CacheServer(new ServerConfig(host: '127.0.0.1', port: 0));
 
         $client = @stream_socket_client('tcp://' . $server->localAddress(), $errno, $errstr, 5);
         self::assertIsResource($client, $errstr);
@@ -90,7 +90,7 @@ final class RedisServerTest extends TestCase
 
     public function testRunAcceptsClientsThroughTheEventLoop(): void
     {
-        $server = new RedisServer(new ServerConfig(host: '127.0.0.1', port: 0));
+        $server = new CacheServer(new ServerConfig(host: '127.0.0.1', port: 0));
 
         $client = @stream_socket_client('tcp://' . $server->localAddress(), $errno, $errstr, 5);
         self::assertIsResource($client, $errstr);
@@ -110,7 +110,7 @@ final class RedisServerTest extends TestCase
     public function testPartialCommandsAccumulateInTheReadBufferAcrossTicks(): void
     {
         $loop = new SelectLoop();
-        $server = new RedisServer(new ServerConfig(host: '127.0.0.1', port: 0), $loop);
+        $server = new CacheServer(new ServerConfig(host: '127.0.0.1', port: 0), $loop);
 
         try {
             $client = @stream_socket_client('tcp://' . $server->localAddress(), $errno, $errstr, 5);
@@ -139,7 +139,7 @@ final class RedisServerTest extends TestCase
     public function testExecutesCommandsSentByARealClientAndRepliesWithResp(): void
     {
         $loop = new SelectLoop();
-        $server = new RedisServer(new ServerConfig(host: '127.0.0.1', port: 0), $loop);
+        $server = new CacheServer(new ServerConfig(host: '127.0.0.1', port: 0), $loop);
 
         try {
             $client = @stream_socket_client('tcp://' . $server->localAddress(), $errno, $errstr, 5);
@@ -167,7 +167,7 @@ final class RedisServerTest extends TestCase
     public function testProcessesMultiplePipelinedCommandsFromOneRead(): void
     {
         $loop = new SelectLoop();
-        $server = new RedisServer(new ServerConfig(host: '127.0.0.1', port: 0), $loop);
+        $server = new CacheServer(new ServerConfig(host: '127.0.0.1', port: 0), $loop);
 
         try {
             $client = @stream_socket_client('tcp://' . $server->localAddress(), $errno, $errstr, 5);
@@ -188,7 +188,7 @@ final class RedisServerTest extends TestCase
     public function testMultipleCommandsPlusATrailingPartialOneAreHandledCorrectly(): void
     {
         $loop = new SelectLoop();
-        $server = new RedisServer(new ServerConfig(host: '127.0.0.1', port: 0), $loop);
+        $server = new CacheServer(new ServerConfig(host: '127.0.0.1', port: 0), $loop);
 
         try {
             $client = @stream_socket_client('tcp://' . $server->localAddress(), $errno, $errstr, 5);
@@ -219,7 +219,7 @@ final class RedisServerTest extends TestCase
     public function testPipelinedCommandsAreAppliedInOrderWithoutWaitingForEachReply(): void
     {
         $loop = new SelectLoop();
-        $server = new RedisServer(new ServerConfig(host: '127.0.0.1', port: 0), $loop);
+        $server = new CacheServer(new ServerConfig(host: '127.0.0.1', port: 0), $loop);
 
         try {
             $client = @stream_socket_client('tcp://' . $server->localAddress(), $errno, $errstr, 5);
@@ -250,7 +250,7 @@ final class RedisServerTest extends TestCase
         $loop = new SelectLoop();
         $clock = new FakeClock(1000.0);
         $store = new InMemoryStore($clock);
-        $server = new RedisServer(new ServerConfig(host: '127.0.0.1', port: 0), $loop, store: $store);
+        $server = new CacheServer(new ServerConfig(host: '127.0.0.1', port: 0), $loop, store: $store);
 
         try {
             $client = @stream_socket_client('tcp://' . $server->localAddress(), $errno, $errstr, 5);
@@ -282,7 +282,7 @@ final class RedisServerTest extends TestCase
         $clock = new FakeClock(1000.0);
         $loop = new SelectLoop($clock);
         $store = new InMemoryStore($clock);
-        $server = new RedisServer(
+        $server = new CacheServer(
             new ServerConfig(host: '127.0.0.1', port: 0),
             $loop,
             store: $store,
@@ -317,7 +317,7 @@ final class RedisServerTest extends TestCase
         // than by how long PHPUnit took between two statements.
         $clock = new FakeClock(1000.0);
         $loop = new SelectLoop($clock);
-        $server = new RedisServer(
+        $server = new CacheServer(
             new ServerConfig(host: '127.0.0.1', port: 0),
             $loop,
             idleTimeoutSeconds: 0.3,
@@ -357,7 +357,7 @@ final class RedisServerTest extends TestCase
     public function testASubscriberReceivesAPublishedMessage(): void
     {
         $loop = new SelectLoop();
-        $server = new RedisServer(new ServerConfig(host: '127.0.0.1', port: 0), $loop);
+        $server = new CacheServer(new ServerConfig(host: '127.0.0.1', port: 0), $loop);
 
         try {
             $subscriberClient = @stream_socket_client('tcp://' . $server->localAddress(), $errno, $errstr, 5);
@@ -388,7 +388,7 @@ final class RedisServerTest extends TestCase
     public function testDisconnectingASubscriberRemovesItFromItsChannels(): void
     {
         $loop = new SelectLoop();
-        $server = new RedisServer(new ServerConfig(host: '127.0.0.1', port: 0), $loop);
+        $server = new CacheServer(new ServerConfig(host: '127.0.0.1', port: 0), $loop);
 
         try {
             $subscriberClient = @stream_socket_client('tcp://' . $server->localAddress(), $errno, $errstr, 5);
@@ -420,7 +420,7 @@ final class RedisServerTest extends TestCase
     public function testPublishingToAConnectionThatIsAlreadyClosedIsANoOp(): void
     {
         $loop = new SelectLoop();
-        $server = new RedisServer(new ServerConfig(host: '127.0.0.1', port: 0), $loop);
+        $server = new CacheServer(new ServerConfig(host: '127.0.0.1', port: 0), $loop);
 
         try {
             $subscriberClient = @stream_socket_client('tcp://' . $server->localAddress(), $errno, $errstr, 5);
@@ -459,7 +459,7 @@ final class RedisServerTest extends TestCase
     public function testAClientThatVanishesMidPipelineDoesNotTakeTheServerDown(): void
     {
         $loop = new SelectLoop();
-        $server = new RedisServer(
+        $server = new CacheServer(
             new ServerConfig(host: '127.0.0.1', port: 0),
             $loop,
             maxWriteBufferBytes: 1000,
@@ -497,7 +497,7 @@ final class RedisServerTest extends TestCase
     public function testASubscriberThatNeverReadsIsDroppedInsteadOfQueuedForever(): void
     {
         $loop = new SelectLoop();
-        $server = new RedisServer(
+        $server = new CacheServer(
             new ServerConfig(host: '127.0.0.1', port: 0),
             $loop,
             // Room for a multi-megabyte PUBLISH to arrive in one piece,
@@ -582,7 +582,7 @@ final class RedisServerTest extends TestCase
     public function testMultiQueuesCommandsAndExecRunsThemInOrder(): void
     {
         $loop = new SelectLoop();
-        $server = new RedisServer(new ServerConfig(host: '127.0.0.1', port: 0), $loop);
+        $server = new CacheServer(new ServerConfig(host: '127.0.0.1', port: 0), $loop);
 
         try {
             $client = @stream_socket_client('tcp://' . $server->localAddress(), $errno, $errstr, 5);
@@ -614,7 +614,7 @@ final class RedisServerTest extends TestCase
     public function testDiscardCancelsAQueuedTransaction(): void
     {
         $loop = new SelectLoop();
-        $server = new RedisServer(new ServerConfig(host: '127.0.0.1', port: 0), $loop);
+        $server = new CacheServer(new ServerConfig(host: '127.0.0.1', port: 0), $loop);
 
         try {
             $client = @stream_socket_client('tcp://' . $server->localAddress(), $errno, $errstr, 5);
@@ -646,7 +646,7 @@ final class RedisServerTest extends TestCase
     public function testAPartialWriteIsQueuedInTheWriteBufferInsteadOfBlocking(): void
     {
         $loop = new SelectLoop();
-        $server = new RedisServer(new ServerConfig(host: '127.0.0.1', port: 0), $loop);
+        $server = new CacheServer(new ServerConfig(host: '127.0.0.1', port: 0), $loop);
 
         try {
             $client = @stream_socket_client('tcp://' . $server->localAddress(), $errno, $errstr, 5);
@@ -676,7 +676,7 @@ final class RedisServerTest extends TestCase
     public function testMalformedInputGetsARespErrorBeforeOnlyThatClientDisconnects(): void
     {
         $loop = new SelectLoop();
-        $server = new RedisServer(new ServerConfig(host: '127.0.0.1', port: 0), $loop);
+        $server = new CacheServer(new ServerConfig(host: '127.0.0.1', port: 0), $loop);
 
         try {
             $client = @stream_socket_client('tcp://' . $server->localAddress(), $errno, $errstr, 5);
@@ -700,7 +700,7 @@ final class RedisServerTest extends TestCase
     public function testAValidCommandBeforeMalformedInputIsStillExecuted(): void
     {
         $loop = new SelectLoop();
-        $server = new RedisServer(new ServerConfig(host: '127.0.0.1', port: 0), $loop);
+        $server = new CacheServer(new ServerConfig(host: '127.0.0.1', port: 0), $loop);
 
         try {
             $client = @stream_socket_client('tcp://' . $server->localAddress(), $errno, $errstr, 5);
@@ -728,7 +728,7 @@ final class RedisServerTest extends TestCase
     public function testClientDisconnectIsDetectedAndCleanedUp(): void
     {
         $loop = new SelectLoop();
-        $server = new RedisServer(new ServerConfig(host: '127.0.0.1', port: 0), $loop);
+        $server = new CacheServer(new ServerConfig(host: '127.0.0.1', port: 0), $loop);
 
         try {
             $client = @stream_socket_client('tcp://' . $server->localAddress(), $errno, $errstr, 5);
@@ -749,10 +749,10 @@ final class RedisServerTest extends TestCase
 
     public function testDataSavedByOneServerIsLoadedByTheNext(): void
     {
-        $path = tempnam(sys_get_temp_dir(), 'mini-redis-snapshot-');
+        $path = tempnam(sys_get_temp_dir(), 'mini-cache-snapshot-');
 
         try {
-            $first = new RedisServer(new ServerConfig(host: '127.0.0.1', port: 0), snapshotPath: $path);
+            $first = new CacheServer(new ServerConfig(host: '127.0.0.1', port: 0), snapshotPath: $path);
             $first->store()->set('name', 'Tanat');
             $first->saveSnapshot();
 
@@ -762,7 +762,7 @@ final class RedisServerTest extends TestCase
             $this->waitForSnapshotFile($path);
             $first->stop();
 
-            $second = new RedisServer(new ServerConfig(host: '127.0.0.1', port: 0), snapshotPath: $path);
+            $second = new CacheServer(new ServerConfig(host: '127.0.0.1', port: 0), snapshotPath: $path);
 
             try {
                 self::assertSame('Tanat', $second->store()->get('name'));
@@ -779,11 +779,11 @@ final class RedisServerTest extends TestCase
 
     public function testPeriodicSnapshotsSaveWithoutBeingAskedExplicitly(): void
     {
-        $path = tempnam(sys_get_temp_dir(), 'mini-redis-snapshot-');
+        $path = tempnam(sys_get_temp_dir(), 'mini-cache-snapshot-');
         $loop = new SelectLoop();
 
         try {
-            $server = new RedisServer(
+            $server = new CacheServer(
                 new ServerConfig(host: '127.0.0.1', port: 0),
                 $loop,
                 snapshotPath: $path,
@@ -797,7 +797,7 @@ final class RedisServerTest extends TestCase
 
                 $this->waitForSnapshotFile($path);
 
-                $reloaded = new RedisServer(new ServerConfig(host: '127.0.0.1', port: 0), snapshotPath: $path);
+                $reloaded = new CacheServer(new ServerConfig(host: '127.0.0.1', port: 0), snapshotPath: $path);
 
                 try {
                     self::assertSame('Tanat', $reloaded->store()->get('name'));
@@ -817,11 +817,11 @@ final class RedisServerTest extends TestCase
 
     public function testAGracefulShutdownSnapshotsWhatWasWrittenSinceTheLastOne(): void
     {
-        $path = tempnam(sys_get_temp_dir(), 'mini-redis-snapshot-');
+        $path = tempnam(sys_get_temp_dir(), 'mini-cache-snapshot-');
         $loop = new SelectLoop();
 
         try {
-            $server = new RedisServer(
+            $server = new CacheServer(
                 new ServerConfig(host: '127.0.0.1', port: 0),
                 $loop,
                 snapshotPath: $path,
@@ -853,11 +853,11 @@ final class RedisServerTest extends TestCase
 
     public function testTheFinalSnapshotIsNotOvertakenByOneAlreadyBeingWritten(): void
     {
-        $path = tempnam(sys_get_temp_dir(), 'mini-redis-snapshot-');
+        $path = tempnam(sys_get_temp_dir(), 'mini-cache-snapshot-');
         $loop = new SelectLoop();
 
         try {
-            $server = new RedisServer(
+            $server = new CacheServer(
                 new ServerConfig(host: '127.0.0.1', port: 0),
                 $loop,
                 snapshotPath: $path,
@@ -905,7 +905,7 @@ final class RedisServerTest extends TestCase
     public function testRequestShutdownStopsAcceptingNewConnectionsButDrainsExistingOnes(): void
     {
         $loop = new SelectLoop();
-        $server = new RedisServer(
+        $server = new CacheServer(
             new ServerConfig(host: '127.0.0.1', port: 0),
             $loop,
             shutdownGraceSeconds: 0.1,
@@ -937,7 +937,7 @@ final class RedisServerTest extends TestCase
     public function testShutdownClosingConnectionsMidPassDoesNotCrashTheLoop(): void
     {
         $loop = new SelectLoop();
-        $server = new RedisServer(
+        $server = new CacheServer(
             new ServerConfig(host: '127.0.0.1', port: 0),
             $loop,
             shutdownGraceSeconds: 0.0,
@@ -968,7 +968,7 @@ final class RedisServerTest extends TestCase
     public function testRequestShutdownIsIdempotent(): void
     {
         $loop = new SelectLoop();
-        $server = new RedisServer(
+        $server = new CacheServer(
             new ServerConfig(host: '127.0.0.1', port: 0),
             $loop,
             shutdownGraceSeconds: 0.05,
@@ -985,7 +985,7 @@ final class RedisServerTest extends TestCase
     public function testSigtermTriggersAGracefulShutdown(): void
     {
         $loop = new SelectLoop();
-        $server = new RedisServer(
+        $server = new CacheServer(
             new ServerConfig(host: '127.0.0.1', port: 0),
             $loop,
             shutdownGraceSeconds: 0.1,
@@ -1011,7 +1011,7 @@ final class RedisServerTest extends TestCase
     public function testAConnectionOverTheLimitIsRejectedWithARespErrorAndClosed(): void
     {
         $loop = new SelectLoop();
-        $server = new RedisServer(
+        $server = new CacheServer(
             new ServerConfig(host: '127.0.0.1', port: 0),
             $loop,
             maxConnections: 1,
@@ -1041,7 +1041,7 @@ final class RedisServerTest extends TestCase
     public function testACommandWithTooManyArgumentsIsRejectedWithoutDisconnecting(): void
     {
         $loop = new SelectLoop();
-        $server = new RedisServer(
+        $server = new CacheServer(
             new ServerConfig(host: '127.0.0.1', port: 0),
             $loop,
             maxArgumentsPerCommand: 2,
@@ -1071,7 +1071,7 @@ final class RedisServerTest extends TestCase
     public function testAnOversizedReadBufferGetsARespErrorAndIsDisconnected(): void
     {
         $loop = new SelectLoop();
-        $server = new RedisServer(
+        $server = new CacheServer(
             new ServerConfig(host: '127.0.0.1', port: 0),
             $loop,
             maxReadBufferBytes: 32,
@@ -1102,7 +1102,7 @@ final class RedisServerTest extends TestCase
     public function testAValueTooBigForTheReadBufferIsRejectedOnItsDeclaredLength(): void
     {
         $loop = new SelectLoop();
-        $server = new RedisServer(
+        $server = new CacheServer(
             new ServerConfig(host: '127.0.0.1', port: 0),
             $loop,
             maxReadBufferBytes: 8 * 1024,
@@ -1136,7 +1136,7 @@ final class RedisServerTest extends TestCase
     public function testAPipelineIsAnsweredInBatchesRatherThanBuiltWhole(): void
     {
         $loop = new SelectLoop();
-        $server = new RedisServer(
+        $server = new CacheServer(
             new ServerConfig(host: '127.0.0.1', port: 0),
             $loop,
             maxWriteBufferBytes: 1024 * 1024,
@@ -1175,7 +1175,7 @@ final class RedisServerTest extends TestCase
     public function testACommandLeftOverFromAPausedPipelineRunsOnceReadingResumes(): void
     {
         $loop = new SelectLoop();
-        $server = new RedisServer(
+        $server = new CacheServer(
             new ServerConfig(host: '127.0.0.1', port: 0),
             $loop,
             maxWriteBufferBytes: 512 * 1024,
@@ -1223,7 +1223,7 @@ final class RedisServerTest extends TestCase
     public function testASlowReaderIsPausedThenResumedOnceItsWriteBufferDrains(): void
     {
         $loop = new SelectLoop();
-        $server = new RedisServer(
+        $server = new CacheServer(
             new ServerConfig(host: '127.0.0.1', port: 0),
             $loop,
             maxWriteBufferBytes: 1000,
@@ -1291,7 +1291,7 @@ final class RedisServerTest extends TestCase
         $loop = new SelectLoop();
         // Pause at 16 MB, but resume once the backlog drains to 4 MB - and
         // critically while bytes are still queued, not only once it empties.
-        $server = new RedisServer(
+        $server = new CacheServer(
             new ServerConfig(host: '127.0.0.1', port: 0),
             $loop,
             maxWriteBufferBytes: 16 * 1024 * 1024,
@@ -1346,7 +1346,7 @@ final class RedisServerTest extends TestCase
     public function testMetricsTrackRealTrafficAndInfoReportsThem(): void
     {
         $loop = new SelectLoop();
-        $server = new RedisServer(new ServerConfig(host: '127.0.0.1', port: 0), $loop);
+        $server = new CacheServer(new ServerConfig(host: '127.0.0.1', port: 0), $loop);
 
         try {
             $client = @stream_socket_client('tcp://' . $server->localAddress(), $errno, $errstr, 5);
@@ -1396,7 +1396,7 @@ final class RedisServerTest extends TestCase
     {
         $clock = new FakeClock(1000.0);
         $loop = new SelectLoop($clock);
-        $server = new RedisServer(
+        $server = new CacheServer(
             new ServerConfig(host: '127.0.0.1', port: 0),
             $loop,
             idleTimeoutSeconds: 0.2,

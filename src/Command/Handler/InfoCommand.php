@@ -14,7 +14,7 @@ use PhpMiniCache\Protocol\RespValue;
 use PhpMiniCache\Storage\Store;
 
 /**
- * A small subset of real Redis's INFO: one bulk string of "key:value"
+ * A small subset of what a full INFO command would report: one bulk string of "key:value"
  * lines, enough to see the server is alive and doing something.
  */
 final readonly class InfoCommand implements CommandHandler

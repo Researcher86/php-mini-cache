@@ -46,7 +46,7 @@ final class ForkingSnapshotWorker
 
     /**
      * Returns false when a snapshot was already being written and this one
-     * was skipped, the way real Redis refuses a `BGSAVE` while one is in
+     * was skipped, the way concurrent snapshot writes are refused by design
      * progress.
      *
      * Skipping matters because the interval between snapshots is configured,

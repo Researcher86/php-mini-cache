@@ -40,7 +40,7 @@ adding a narrower, Pub/Sub-specific hook.
 
 The alternative considered was keeping `CommandHandler` untouched and
 special-casing `SUBSCRIBE`/`PUBLISH`/`MULTI`/`EXEC`/`DISCARD` directly
-inside `RedisServer::executeValue()`, bypassing the dispatcher for those
+inside `CacheServer::executeValue()`, bypassing the dispatcher for those
 five names. Rejected: it would have meant two different ways a command
 could be handled depending on its name, which is exactly the kind of
 special-casing the dispatcher exists to avoid (Phase 11's own stated goal:
@@ -60,7 +60,7 @@ Commands → State, restated in
 Instead, `ChannelRegistry` and `TransactionManager` each keep their own
 `array<int, ...>` keyed by `ClientConnection::id()` (the resource id of the
 connection's socket). Cleanup on disconnect is explicit -
-`RedisServer::disconnectClient()` calls `unsubscribeAll()` and `discard()`
+`CacheServer::disconnectClient()` calls `unsubscribeAll()` and `discard()`
 on both - rather than relying on the connection object's own destruction to
 imply it.
 
@@ -81,11 +81,11 @@ more bytes the way a merely-incomplete value can.
 ## Malformed input still disconnects, but with a RESP error first
 
 A `ProtocolException` while parsing a connection's buffer
-(`RedisServer::processBufferedCommands()`) writes a `-ERR Protocol
+(`CacheServer::processBufferedCommands()`) writes a `-ERR Protocol
 error: ...` reply and then closes the connection
 (`sendErrorAndDisconnect()`), rather than either silently disconnecting
 (Phase 12's original interim behavior) or trying to keep the connection
-open. Real Redis does the same for the same reason: a genuinely-not-RESP
+open. The reference implementation does the same for the same reason: a genuinely-not-RESP
 byte stream cannot be resynchronized - there is no reliable way to find
 the start of the next value once framing is lost - so the connection
 still has to end, but the client is not left guessing why.
@@ -96,19 +96,19 @@ torn down in the same call, so there is no next event loop tick left for
 a queued partial write to finish on.
 
 Commands that already arrived complete *before* the bad byte are still
-applied in order, mirroring how real Redis processes a pipeline: a client
+applied in order, mirroring how the reference implementation processes a pipeline: a client
 that mixed one valid command and one broken one sees the valid one take
 effect and *then* the `-ERR Protocol error: ...` reply before the
 disconnect. That falls out of how `processBufferedCommands()` reads: it
 parses and executes one value at a time, so a `ProtocolException` ends
 the loop with everything before it already done - see
-`RedisServerTest::testAValidCommandBeforeMalformedInputIsStillExecuted`.
+`CacheServerTest::testAValidCommandBeforeMalformedInputIsStillExecuted`.
 
 ## `SetCommand`'s `EX` option, not a generic options parser
 
 `SET key value EX seconds` is parsed as a fixed 4- or 2-argument shape
 inside `SetCommand` itself, rather than through a generic
-option-parsing helper shared across commands. Real Redis's `SET` accepts
+option-parsing helper shared across commands. The reference `SET` accepts
 several mutually-exclusive and combinable options (`EX`, `PX`, `NX`, `XX`,
 `KEEPTTL`, ...); this project implements exactly the one option Phase 16
 asks for. A shared parser would be premature generalization for a single
@@ -130,7 +130,7 @@ now.** A closure had to be a genuine one captured with `use (&$now)`,
 never a `static fn(): float => $now` arrow function - an arrow function
 captures `$now` *by value* when it is created, so advancing the outer
 variable afterwards changes nothing it returns. That was a real bug during
-Phase 16/17 test-writing: both `InMemoryStoreTest` and `RedisServerTest`'s
+Phase 16/17 test-writing: both `InMemoryStoreTest` and `CacheServerTest`'s
 TTL/idle-timeout tests asserted against a clock that never moved and
 passed anyway. A named `FakeClock` with an `advance()` method has no
 by-value form to get wrong, and matches how `php-worker-pool` states the
@@ -179,7 +179,7 @@ yet reached, never with keys that are gone.
 
 ## One clock reaches everything that measures time
 
-`Clock` is injected into `SelectLoop`, `InMemoryStore`, `RedisServer` -
+`Clock` is injected into `SelectLoop`, `InMemoryStore`, `CacheServer` -
 and `ClientConnection`, which is the one that had to be added later.
 Connections stamped their own last-activity time with `microtime(true)`
 while the idle check compared it against the server's `Clock`: two clocks
@@ -193,7 +193,7 @@ as whatever reads it, or the seam is decorative.
 
 ## The idle-timeout and expiration-sweep timers share one interval parameter
 
-`RedisServer`'s `idleTimeoutSeconds` doubles as both the threshold *and*
+`CacheServer`'s `idleTimeoutSeconds` doubles as both the threshold *and*
 the check cadence - a connection is swept for idleness on the same timer
 whose period equals the timeout itself, rather than on a separate, tighter
 polling interval. This means an idle connection is closed within one
@@ -205,7 +205,7 @@ becomes a first-class event loop event"), not exact SLA-grade timing.
 
 ## A closed connection is never written to, only skipped
 
-`RedisServer` drops a connection the moment a write to it fails
+`CacheServer` drops a connection the moment a write to it fails
 (`flushWriteBuffer()`), which closes its socket. Two callers still hold a
 reference to that connection afterwards and used to keep writing to it:
 the rest of the pipeline being answered in `processBufferedCommands()`,
@@ -226,7 +226,7 @@ ran *after* the failed flush and put the dropped connection's id back into
 Nothing removes it again, and because ids are socket resource ids they get
 reused - the next connection to land on that id looks paused, so
 backpressure silently stops applying to it. Pinned by
-`RedisServerTest::testAClientThatVanishesMidPipelineDoesNotTakeTheServerDown`.
+`CacheServerTest::testAClientThatVanishesMidPipelineDoesNotTakeTheServerDown`.
 
 ## `Store` grew `setKeepingTtl()` rather than letting INCR reset a TTL
 
@@ -247,11 +247,11 @@ Store: the value changes, the expiration does not.
 
 It returns `false` for a key that is absent (or already expired) instead
 of creating one, so `INCR` still writes a missing counter as a new,
-permanent key - which is what real Redis does with both cases.
+permanent key - which is what the reference implementation does with both cases.
 
 ## The client keeps pipelining and transactions in the caller's hands
 
-`RedisClient` has a method per command - `get()`, `set()`, `increment()` -
+`CacheClient` has a method per command - `get()`, `set()`, `increment()` -
 and then deliberately stops short of two things a fuller client would
 smooth over.
 
@@ -321,7 +321,7 @@ itself as working the whole time.
 So delivery has a second line: past `hardSubscriberWriteBufferBytes` the
 subscriber is disconnected rather than queued for. Ordinary clients keep
 no such limit - what they queue is bounded by what they asked for - which
-is the same split real Redis draws between the `normal` and `pubsub`
+is the same split the reference implementation draws between the `normal` and `pubsub`
 classes of `client-output-buffer-limit`. Dropping is the only option
 available: there is no way to tell a publisher to slow down that does not
 punish every other subscriber on the channel.
@@ -336,7 +336,7 @@ the buffer and came back as `-ERR Protocol error: too big buffer` - after
 half a megabyte of it had already been sent, and with a message about a
 buffer the client never asked about.
 
-`RedisServer` now derives the parser's `maxBulkStringBytes` from
+`CacheServer` now derives the parser's `maxBulkStringBytes` from
 `maxReadBufferBytes` (less a kilobyte of headroom for the array header,
 the command name and each length line). The size of the buffer is the
 answer to "how large a value may be", asked once. A value over it is
@@ -359,7 +359,7 @@ that client's socket as readable in the very same pass. Dispatching it
 then handed a just-closed socket to its read listener - a `TypeError`,
 i.e. `SIGTERM` killed the server outright exactly when it was supposed to
 be shutting down cleanly. That path is pinned by
-`RedisServerTest::testShutdownClosingConnectionsMidPassDoesNotCrashTheLoop`.
+`CacheServerTest::testShutdownClosingConnectionsMidPassDoesNotCrashTheLoop`.
 
 Two guards, because the stream can go away at two different moments:
 `tick()` drops closed streams from both listener maps before building the

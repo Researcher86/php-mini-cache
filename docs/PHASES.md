@@ -1,4 +1,4 @@
-# PHP Mini Redis — How It Was Built
+# PHP Mini Cache — How It Was Built
 
 The plan this project was built from: forty phases, Phase 0 through
 Phase 39, each with what it had to achieve and how it was confirmed done.
@@ -52,7 +52,7 @@ one test answers for one line of the plan. The whole suite runs with
        Protocol Parser      │
               │             │
               ▼             │
-        Redis Command       │
+        Cache Command       │
               │             │
               ▼             │
        Command Dispatcher   │
@@ -76,7 +76,7 @@ one test answers for one line of the plan. The whole suite runs with
 - [x] Phase 3 — Event Loop
 - [x] Phase 4 — Non-Blocking Sockets
 - [x] Phase 5 — Read Buffer
-- [x] Phase 6 — Redis Protocol
+- [x] Phase 6 — RESP Protocol
 - [x] Phase 7 — RESP Parser
 - [x] Phase 8 — Command Model
 - [x] Phase 9 — In-Memory Store
@@ -153,9 +153,9 @@ A client can establish a TCP connection.
 
 ## Tests
 
-- [tests/Server/RedisServerTest.php](../tests/Server/RedisServerTest.php) -
+- [tests/Server/CacheServerTest.php](../tests/Server/CacheServerTest.php) -
   `testItAcceptsAConnectingClient` (a real `stream_socket_client()` against
-  a real `RedisServer`) and `testAcceptTimesOutWithoutAClient`.
+  a real `CacheServer`) and `testAcceptTimesOutWithoutAClient`.
 
 ---
 
@@ -212,7 +212,7 @@ them.
 - [tests/EventLoop/SelectLoopTest.php](../tests/EventLoop/SelectLoopTest.php) -
   `testOnReadableFiresWhenDataArrives`, `testOnWritableFiresForAWritableStream`,
   `testRemoveReadableStopsDispatching`, `testStopEndsRun`.
-- [tests/Server/RedisServerTest.php](../tests/Server/RedisServerTest.php) -
+- [tests/Server/CacheServerTest.php](../tests/Server/CacheServerTest.php) -
   `testRunAcceptsClientsThroughTheEventLoop`.
 
 ---
@@ -234,7 +234,7 @@ Slow or silent clients do not block other clients.
 
 ## Tests
 
-- [tests/Server/RedisServerTest.php](../tests/Server/RedisServerTest.php) -
+- [tests/Server/CacheServerTest.php](../tests/Server/CacheServerTest.php) -
   `testAcceptedSocketIsNonBlocking`: a read with nothing sent returns `''`
   immediately instead of stalling the test.
 
@@ -261,13 +261,13 @@ Partial TCP messages are handled correctly.
 
 - [tests/Connection/ReadBufferTest.php](../tests/Connection/ReadBufferTest.php) -
   `testAppendAccumulatesFragmentedWrites`, `testConsumeRemovesAPrefix`.
-- [tests/Server/RedisServerTest.php](../tests/Server/RedisServerTest.php) -
+- [tests/Server/CacheServerTest.php](../tests/Server/CacheServerTest.php) -
   `testPartialCommandsAccumulateInTheReadBufferAcrossTicks`,
   `testClientDisconnectIsDetectedAndCleanedUp`.
 
 ---
 
-# Phase 6 — Redis Protocol
+# Phase 6 — RESP Protocol
 
 ## Goal
 
@@ -389,7 +389,7 @@ Implement the first commands: `PING`, `SET`, `GET`, `DEL`, `EXISTS`, `INCR`.
 
 ## Definition of Done
 
-The server behaves like a tiny Redis-like database.
+The server behaves like a tiny in-memory cache database.
 
 ## Tests
 
@@ -437,7 +437,7 @@ full loop: read → parse → dispatch → encode → write.
 
 * [x] Wire `RespParser` → `Command::fromRespValue()` →
       `CommandDispatcher::dispatch()` → `RespEncoder::encode()` into
-      `RedisServer`
+      `CacheServer`
 * [x] Malformed protocol input disconnects only the offending client
 
 ## Definition of Done
@@ -446,7 +446,7 @@ Clients receive valid RESP responses over a real socket.
 
 ## Tests
 
-- [tests/Server/RedisServerTest.php](../tests/Server/RedisServerTest.php) -
+- [tests/Server/CacheServerTest.php](../tests/Server/CacheServerTest.php) -
   `testExecutesCommandsSentByARealClientAndRepliesWithResp` (PING/SET/GET
   over a real connection) and `testMalformedInputDisconnectsOnlyThatClient`.
 
@@ -475,7 +475,7 @@ silently truncated or blocking the event loop.
 
 - [tests/Connection/WriteBufferTest.php](../tests/Connection/WriteBufferTest.php) -
   `testConsumeRemovesAPrefixAfterAPartialWrite`.
-- [tests/Server/RedisServerTest.php](../tests/Server/RedisServerTest.php) -
+- [tests/Server/CacheServerTest.php](../tests/Server/CacheServerTest.php) -
   `testAPartialWriteIsQueuedInTheWriteBufferInsteadOfBlocking`: an 8 MB
   response does not fit in one `fwrite()`, proven by inspecting the queued
   remainder rather than by timing.
@@ -491,7 +491,7 @@ partial command left for the next one.
 
 ## Tasks
 
-* [x] `RedisServer` loops over the read buffer until it holds no complete
+* [x] `CacheServer` loops over the read buffer until it holds no complete
       value, carrying the parser's offset from one command to the next
       (Phase 39 bounds how much of that happens in one turn)
 
@@ -502,7 +502,7 @@ one queued.
 
 ## Tests
 
-- [tests/Server/RedisServerTest.php](../tests/Server/RedisServerTest.php) -
+- [tests/Server/CacheServerTest.php](../tests/Server/CacheServerTest.php) -
   `testMultipleCommandsPlusATrailingPartialOneAreHandledCorrectly`: two
   complete `PING`s plus the start of a third in one write, the two replies
   arrive immediately and the partial remainder stays in the read buffer.
@@ -526,7 +526,7 @@ The server supports pipelined commands.
 
 ## Tests
 
-- [tests/Server/RedisServerTest.php](../tests/Server/RedisServerTest.php) -
+- [tests/Server/CacheServerTest.php](../tests/Server/CacheServerTest.php) -
   `testPipelinedCommandsAreAppliedInOrderWithoutWaitingForEachReply`: `SET`,
   `INCR`, `GET` on the same key, sent back to back, in one read.
 
@@ -561,7 +561,7 @@ Keys can expire automatically.
   clock closure, not real sleeps.
 - [tests/Command/Handler/SetCommandTest.php](../tests/Command/Handler/SetCommandTest.php) -
   `testStoresTheValueWithATtlWhenGivenEx`.
-- [tests/Server/RedisServerTest.php](../tests/Server/RedisServerTest.php) -
+- [tests/Server/CacheServerTest.php](../tests/Server/CacheServerTest.php) -
   `testAKeySetWithExExpiresAfterItsTtl`, over a real connection.
 
 ---
@@ -579,7 +579,7 @@ sweeps expired keys even if nothing ever reads them.
 ## Tasks
 
 * [x] `Store::sweepExpired()`
-* [x] `RedisServer` runs it on a repeating timer
+* [x] `CacheServer` runs it on a repeating timer
 
 ## Definition of Done
 
@@ -590,7 +590,7 @@ proven to disappear without ever being read.
 
 - [tests/Storage/InMemoryStoreTest.php](../tests/Storage/InMemoryStoreTest.php) -
   `testSweepExpiredRemovesOnlyExpiredEntriesAndReportsHowMany`.
-- [tests/Server/RedisServerTest.php](../tests/Server/RedisServerTest.php) -
+- [tests/Server/CacheServerTest.php](../tests/Server/CacheServerTest.php) -
   `testExpiredKeysAreActivelyRemovedByTheSweepTimerWithoutBeingRead`: reads
   the store's raw entries via `ReflectionProperty` specifically to avoid
   triggering Phase 16's own lazy expiration and calling the wrong mechanism
@@ -639,7 +639,7 @@ configured timeout is closed.
 
 ## Tasks
 
-* [x] `RedisServer` accepts an optional `idleTimeoutSeconds`
+* [x] `CacheServer` accepts an optional `idleTimeoutSeconds`
 * [x] A repeating timer closes connections past it, leaving active ones
       alone
 
@@ -650,7 +650,7 @@ mistaken for idle ones.
 
 ## Tests
 
-- [tests/Server/RedisServerTest.php](../tests/Server/RedisServerTest.php) -
+- [tests/Server/CacheServerTest.php](../tests/Server/CacheServerTest.php) -
   `testIdleConnectionsAreClosedAfterTheTimeoutButActiveOnesAreNot`: an idle
   client is closed while a second, active client (touched moments before
   the same check) is not - both compared within one `tick()` so the
@@ -687,7 +687,7 @@ disconnecting removes it from every channel it had joined.
 - [tests/Command/Handler/SubscribeCommandTest.php](../tests/Command/Handler/SubscribeCommandTest.php)
   and [PublishCommandTest.php](../tests/Command/Handler/PublishCommandTest.php) -
   `testDeliversTheMessageToEverySubscriberAndReturnsHowMany`.
-- [tests/Server/RedisServerTest.php](../tests/Server/RedisServerTest.php) -
+- [tests/Server/CacheServerTest.php](../tests/Server/CacheServerTest.php) -
   `testASubscriberReceivesAPublishedMessage` (two real connections) and
   `testDisconnectingASubscriberRemovesItFromItsChannels`.
 
@@ -723,7 +723,7 @@ real connection.
 - [tests/Command/Handler/MultiCommandTest.php](../tests/Command/Handler/MultiCommandTest.php),
   [ExecCommandTest.php](../tests/Command/Handler/ExecCommandTest.php),
   [DiscardCommandTest.php](../tests/Command/Handler/DiscardCommandTest.php).
-- [tests/Server/RedisServerTest.php](../tests/Server/RedisServerTest.php) -
+- [tests/Server/CacheServerTest.php](../tests/Server/CacheServerTest.php) -
   `testMultiQueuesCommandsAndExecRunsThemInOrder`,
   `testDiscardCancelsAQueuedTransaction`.
 
@@ -742,7 +742,7 @@ on startup.
 * [x] `InMemoryStore::snapshot()` / `restore()` (value + TTL, per key)
 * [x] `SnapshotStore` writes to a temp file and renames into place (a
       crash mid-write cannot leave a half-written snapshot)
-* [x] `RedisServer` loads a snapshot at construction time if a
+* [x] `CacheServer` loads a snapshot at construction time if a
       `snapshotPath` is configured, and exposes `saveSnapshot()`
 * [x] An optional repeating timer calls `saveSnapshot()` automatically
 * [x] `stop()` writes one final snapshot, synchronously, so a shutdown the
@@ -754,7 +754,7 @@ on startup.
 
 ## Definition of Done
 
-A key set by one `RedisServer` instance survives into a second instance
+A key set by one `CacheServer` instance survives into a second instance
 constructed with the same snapshot path afterward.
 
 ## Tests
@@ -766,7 +766,7 @@ constructed with the same snapshot path afterward.
   `testSavedValuesAreRestoredIntoAnotherStore`, `testATtlSurvivesTheRoundTrip`,
   `testSaveOverwritesAPreviousSnapshot`,
   `testLoadIntoAFreshStoreIsANoOpWhenNoSnapshotExists`.
-- [tests/Server/RedisServerTest.php](../tests/Server/RedisServerTest.php) -
+- [tests/Server/CacheServerTest.php](../tests/Server/CacheServerTest.php) -
   `testDataSavedByOneServerIsLoadedByTheNext` (the Definition of Done,
   literally), `testPeriodicSnapshotsSaveWithoutBeingAskedExplicitly` and
   `testAGracefulShutdownSnapshotsWhatWasWrittenSinceTheLastOne`.
@@ -782,7 +782,7 @@ stop accepting, finish in-flight responses, then exit.
 
 ## Tasks
 
-* [x] `RedisServer::requestShutdown()`: idempotent, removes the listening
+* [x] `CacheServer::requestShutdown()`: idempotent, removes the listening
       socket's readable registration (no new connections accepted through
       the event loop) but leaves existing connections' read/write
       listeners untouched
@@ -800,7 +800,7 @@ shutdown begins is not simply cut off - only new ones are refused.
 
 ## Tests
 
-- [tests/Server/RedisServerTest.php](../tests/Server/RedisServerTest.php) -
+- [tests/Server/CacheServerTest.php](../tests/Server/CacheServerTest.php) -
   `testRequestShutdownStopsAcceptingNewConnectionsButDrainsExistingOnes`
   (a second client, connected before shutdown was requested, is never
   accepted through the loop afterward), `testRequestShutdownIsIdempotent`,
@@ -828,7 +828,7 @@ of the interim disconnect-on-malformed-input behavior from Phase 12.
       range` (`IncrCommand`, Phase 10)
 * [x] Malformed command shape (e.g. a non-array RESP value where a
       command is expected) → `-ERR ...` (`Command::fromRespValue()` +
-      `CommandException`, caught in `RedisServer::executeValue()`)
+      `CommandException`, caught in `CacheServer::executeValue()`)
 * [x] A malformed protocol stream (`ProtocolException`) now writes a
       `-ERR Protocol error: ...` reply before disconnecting, instead of
       disconnecting silently - see
@@ -850,7 +850,7 @@ connection, and even that case is told why before it closes.
   [IncrCommandTest::testRejectsANonIntegerValue](../tests/Command/Handler/IncrCommandTest.php).
 - [tests/Command/CommandTest.php](../tests/Command/CommandTest.php) - the
   `testRejects*` cases for a malformed command shape.
-- [tests/Server/RedisServerTest.php](../tests/Server/RedisServerTest.php) -
+- [tests/Server/CacheServerTest.php](../tests/Server/CacheServerTest.php) -
   `testMalformedInputGetsARespErrorBeforeOnlyThatClientDisconnects`.
 
 ---
@@ -895,7 +895,7 @@ rather than a single malformed command).
 
 ## Tests
 
-- [tests/Server/RedisServerTest.php](../tests/Server/RedisServerTest.php) -
+- [tests/Server/CacheServerTest.php](../tests/Server/CacheServerTest.php) -
   `testAConnectionOverTheLimitIsRejectedWithARespErrorAndClosed`,
   `testACommandWithTooManyArgumentsIsRejectedWithoutDisconnecting` (the
   connection keeps working afterward - a following command still gets a
@@ -935,7 +935,7 @@ count and the store's own state, not by timing.
 
 ## Tests
 
-- [tests/Server/RedisServerTest.php](../tests/Server/RedisServerTest.php) -
+- [tests/Server/CacheServerTest.php](../tests/Server/CacheServerTest.php) -
   `testASlowReaderIsPausedThenResumedOnceItsWriteBufferDrains`: an 8 MB
   response overflows a 1000-byte limit, a command sent while paused is
   never read into the connection's buffer at all, and once the backlog is
@@ -956,12 +956,12 @@ in/out, expired keys.
 
 * [x] `ServerMetrics`: connections total, commands processed (overall and
       per command name), bytes read/written, errors, expired keys
-* [x] `RedisServer` records into it at every point that already existed
+* [x] `CacheServer` records into it at every point that already existed
       for another reason - accepting a connection, reading a chunk,
       dispatching a command, an error reply, a partial write, the
       expiration sweep timer - rather than a second pass over the code
-* [x] `INFO` command: one bulk string of `key:value` lines, matching real
-      Redis's own convention for the reply shape
+* [x] `INFO` command: one bulk string of `key:value` lines, matching the
+      reference implementation's own convention for the reply shape
 
 ## Definition of Done
 
@@ -976,7 +976,7 @@ protocol itself (`INFO`) rather than a log file or a second channel.
   the formatted reply, and that `connected_clients` reflects the
   `ConnectionManager` rather than the metrics object (they track different
   things: connections *ever* accepted vs. connections *currently* open).
-- [tests/Server/RedisServerTest.php](../tests/Server/RedisServerTest.php) -
+- [tests/Server/CacheServerTest.php](../tests/Server/CacheServerTest.php) -
   `testMetricsTrackRealTrafficAndInfoReportsThem`: real commands over a
   real connection, then `INFO` itself confirms its own call was counted.
 
@@ -993,7 +993,7 @@ real server), and failure scenarios.
 
 Largely already true as a consequence of how phases 0-27 were built rather
 than a separate pass: every phase above already has both handler-level unit
-tests and `RedisServerTest` integration tests over a real socket, and each
+tests and `CacheServerTest` integration tests over a real socket, and each
 of the plan's own named failure scenarios already has coverage somewhere -
 partial requests (Phase 5/7), invalid RESP (Phase 24), unknown commands
 (Phase 11), a slow/absent reader (Phase 26), a large response (Phase 13),
@@ -1013,7 +1013,7 @@ combination above that no single phase's own tests would have caught.
 
 ## Tests
 
-- [tests/Server/RedisServerTest.php](../tests/Server/RedisServerTest.php) -
+- [tests/Server/CacheServerTest.php](../tests/Server/CacheServerTest.php) -
   `testAnIdleTimedOutSubscriberIsUnsubscribedFromItsChannels`: a subscriber
   goes silent past the idle timeout, and a subsequent `PUBLISH` to its
   channel reaches zero recipients, the same as a clean disconnect would
@@ -1049,7 +1049,7 @@ this does not measure").
 
 None of its own - `bin/bench.php` is a measurement tool exercised by
 running it, the same way `bin/client.php` is; both are covered
-functionally by `RedisServerTest`'s exercise of the same protocol paths.
+functionally by `CacheServerTest`'s exercise of the same protocol paths.
 
 ---
 
@@ -1120,7 +1120,7 @@ itself.
 * [x] Parser-level limits, enforced on the declared header before the
       body/elements are looked at:
       - `maxBulkStringBytes` (the parser's own default is 1 MiB;
-        `RedisServer` derives it from `maxReadBufferBytes` instead, see
+        `CacheServer` derives it from `maxReadBufferBytes` instead, see
         Phase 25) — a `$999999999...` header errors up front instead of
         making the parser scan for a huge body
       - `maxArrayElements` (1 000 000) — a structural backstop so an
@@ -1192,16 +1192,16 @@ being processed while response bytes are still queued.
 
 ## Tests
 
-* `RedisServerTest::testASlowReaderResumesWhenItsWriteBufferHitsTheLowWatermark` -
+* `CacheServerTest::testASlowReaderResumesWhenItsWriteBufferHitsTheLowWatermark` -
   a 20 MB response pauses a 16 MiB-cap connection; the backlog is drained
   to 6 MiB, the client catches up in megabyte chunks until the queue
   crosses the 4 MiB resumption level (still holding bytes), and the
   command sent while paused is then processed - all while the WriteBuffer
   is never empty
-* `RedisServerTest::testASlowReaderIsPausedThenResumedOnceItsWriteBufferDrains`
+* `CacheServerTest::testASlowReaderIsPausedThenResumedOnceItsWriteBufferDrains`
   (Phase 26) still passes unchanged - an empty-buffer resume remains a
   special case of the low-watermark rule
-* `RedisServerTest::testASubscriberThatNeverReadsIsDroppedInsteadOfQueuedForever` -
+* `CacheServerTest::testASubscriberThatNeverReadsIsDroppedInsteadOfQueuedForever` -
   a subscriber that reads nothing while a publisher keeps publishing is
   disconnected and unsubscribed once its backlog passes the hard limit,
   rather than being paused (which would throttle nothing) and queued for
@@ -1345,7 +1345,7 @@ disk asynchronously. Loading remains unchanged.
 
 * `ForkingSnapshotWorkerTest::testTheForkedChildWritesALoadableSnapshot` -
   the forked child's write lands and reloads into a fresh store
-* `RedisServerTest::testDataSavedByOneServerIsLoadedByTheNext` and
+* `CacheServerTest::testDataSavedByOneServerIsLoadedByTheNext` and
   `testPeriodicSnapshotsSaveWithoutBeingAskedExplicitly` were updated for
   the async write: they wait for the snapshot file to land (clearing PHP's
   stat cache, which otherwise keeps reporting the stale empty `tempnam`
@@ -1374,7 +1374,7 @@ This stays the case until either:
 
 The `EventLoop` interface (including the Phase 34 `metrics()` accessor)
 was deliberately shaped so such a loop can drop in without touching
-`RedisServer` or its tests.
+`CacheServer` or its tests.
 
 ---
 
@@ -1384,7 +1384,7 @@ was deliberately shaped so such a loop can drop in without touching
 
 Phase-by-phase work had proven each behavior correct against targeted
 tests, but nothing showed how the server fared under realistic load. The
-review called for evidence across the shapes of traffic a Redis server
+review called for evidence across the shapes of traffic a cache server
 actually sees: a pipelined client, a slow client under backpressure,
 Pub/Sub fan-out to many subscribers, and memory growth.
 
@@ -1430,7 +1430,7 @@ their own. Give the server one client, the way `php-worker-pool` has one
 
 ## Tasks
 
-* [x] `PhpMiniCache\Sdk\RedisClient`: one method per command the server implements,
+* [x] `PhpMiniCache\Sdk\CacheClient`: one method per command the server implements,
       plus `command()` for anything else
 * [x] Pipelining as `pipeline()` - every command written before any reply
       is read, one round trip for the batch
@@ -1439,7 +1439,7 @@ their own. Give the server one client, the way `php-worker-pool` has one
       rather than a result
 * [x] Pub/Sub as `subscribe()` plus `nextMessage()`, where "nothing
       arrived in time" is a `null`, not an exception
-* [x] Failures are exceptions under one `RedisClientException`: the server
+* [x] Failures are exceptions under one `CacheClientException`: the server
       refusing a command, the connection going away, a reply not arriving
       in time, and never connecting at all
 * [x] Non-blocking socket underneath, so every wait is bounded by the
@@ -1455,7 +1455,7 @@ checked.
 
 ## Tests
 
-* [tests/Sdk/RedisClientTest.php](../tests/Sdk/RedisClientTest.php) -
+* [tests/Sdk/CacheClientTest.php](../tests/Sdk/CacheClientTest.php) -
   drives `bin/server.php` as a real process on a kernel-picked port and
   exercises each shape against it: the typed commands, an error reply
   raised rather than returned, a pipeline whose failed command does not
@@ -1515,18 +1515,18 @@ not grow with the size of the backlog.
 
 ## Tests
 
-* `RedisServerTest::testTheFinalSnapshotIsNotOvertakenByOneAlreadyBeingWritten` -
+* `CacheServerTest::testTheFinalSnapshotIsNotOvertakenByOneAlreadyBeingWritten` -
   a scheduled snapshot forks, the store moves on, and `stop()` must leave
   the newer state on disk
-* `RedisServerTest::testAPipelineIsAnsweredInBatchesRatherThanBuiltWhole` -
+* `CacheServerTest::testAPipelineIsAnsweredInBatchesRatherThanBuiltWhole` -
   2 KB of commands asking for 20 MB of replies queues the pause level plus
   one batch, not the 20 MB
-* `RedisServerTest::testACommandLeftOverFromAPausedPipelineRunsOnceReadingResumes` -
+* `CacheServerTest::testACommandLeftOverFromAPausedPipelineRunsOnceReadingResumes` -
   the tail of a paused pipeline runs when the client catches up, with
   nothing new arriving on the connection
 * `WriteBufferTest::testConsumeDropsTheWrittenPrefixAfterAPartialWrite` -
   the offset model still behaves like a queue
-* `RedisServerTest::testIdleConnectionsAreClosedAfterTheTimeoutButActiveOnesAreNot`
+* `CacheServerTest::testIdleConnectionsAreClosedAfterTheTimeoutButActiveOnesAreNot`
   and `::testAnIdleTimedOutSubscriberIsUnsubscribedFromItsChannels` - both
   now driven by `FakeClock`
 
@@ -1536,7 +1536,7 @@ not grow with the size of the backlog.
 
 Do not optimize for:
 
-> Redis compatibility.
+> Any specific cache product's compatibility.
 
 Optimize for:
 

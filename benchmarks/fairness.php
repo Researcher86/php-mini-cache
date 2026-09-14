@@ -24,7 +24,7 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/examples/bootstrap.php';
 
-use PhpMiniCache\Sdk\RedisClient;
+use PhpMiniCache\Sdk\CacheClient;
 
 const PIPELINE_COMMANDS = 100_000;
 const BASELINE_PROBES = 500;
@@ -63,7 +63,7 @@ function report(string $label, array $latenciesMs): void
  *
  * @return array<string, float>
  */
-function serverCounters(RedisClient $client): array
+function serverCounters(CacheClient $client): array
 {
     $counters = [];
 

@@ -3,8 +3,8 @@
 
 declare(strict_types=1);
 
-use PhpMiniCache\Sdk\RedisClient;
-use PhpMiniCache\Sdk\RedisClientException;
+use PhpMiniCache\Sdk\CacheClient;
+use PhpMiniCache\Sdk\CacheClientException;
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
@@ -19,7 +19,7 @@ require dirname(__DIR__) . '/vendor/autoload.php';
  */
 function runBenchClient(string $host, int $port, array $command, int $requests, string $resultFile): void
 {
-    $client = new RedisClient($host, $port);
+    $client = new CacheClient($host, $port);
     $latenciesMs = [];
 
     try {
@@ -28,7 +28,7 @@ function runBenchClient(string $host, int $port, array $command, int $requests, 
             $client->command(...$command);
             $latenciesMs[] = (microtime(true) - $start) * 1000;
         }
-    } catch (RedisClientException $exception) {
+    } catch (CacheClientException $exception) {
         fwrite(STDERR, sprintf("Client gave up after %d requests: %s\n", count($latenciesMs), $exception->getMessage()));
     } finally {
         $client->close();
@@ -59,8 +59,8 @@ $options = getopt('', ['clients:', 'requests:', 'command:', 'host:', 'port:']);
 $clients = (int) ($options['clients'] ?? 10);
 $requestsPerClient = (int) ($options['requests'] ?? 1000);
 $commandName = strtoupper((string) ($options['command'] ?? 'PING'));
-$host = (string) ($options['host'] ?? (getenv('REDIS_HOST') ?: '127.0.0.1'));
-$port = (int) ($options['port'] ?? (getenv('REDIS_PORT') ?: 6380));
+$host = (string) ($options['host'] ?? (getenv('CACHE_HOST') ?: '127.0.0.1'));
+$port = (int) ($options['port'] ?? (getenv('CACHE_PORT') ?: 6380));
 
 $command = match ($commandName) {
     'PING' => ['PING'],
@@ -76,7 +76,7 @@ if ($command === null) {
     exit(1);
 }
 
-$resultsDir = sys_get_temp_dir() . '/mini-redis-bench-' . getmypid();
+$resultsDir = sys_get_temp_dir() . '/mini-cache-bench-' . getmypid();
 
 if (!mkdir($resultsDir) && !is_dir($resultsDir)) {
     fwrite(STDERR, sprintf("Could not create %s\n", $resultsDir));

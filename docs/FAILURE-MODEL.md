@@ -3,7 +3,7 @@
 What breaks, what survives it, and what this server does **not** guarantee.
 Read this before trusting it with anything beyond learning how it works -
 it is an educational implementation (see the README's Final Principle), not
-a Redis replacement.
+a production cache.
 
 ---
 
@@ -14,7 +14,7 @@ event loop - lives in one PHP process. There is no replication, no
 clustering, no secondary that takes over if the process dies.
 
 ```text
-RedisServer process dies
+CacheServer process dies
          │
          ▼
 Every connected client is dropped
@@ -31,7 +31,7 @@ way `php-worker-pool`'s Master has no supervisor of its own either.
 ## In-memory only, unless a snapshot path is configured
 
 `InMemoryStore` holds every key in a PHP array. A process restart - crash,
-deploy, `SIGKILL` - loses every key, unless `RedisServer` was constructed
+deploy, `SIGKILL` - loses every key, unless `CacheServer` was constructed
 with a `snapshotPath` (see [PHASES.md](PHASES.md#phase-22--persistence)).
 Even then, a snapshot only covers whatever was last written to it: without
 `snapshotIntervalSeconds` configured too, that means whatever was on disk
@@ -101,12 +101,12 @@ delivery is produced by whoever publishes, so a subscriber that never
 reads is not slowed down by having its own reads paused - it is dropped
 once its backlog passes `hardSubscriberWriteBufferBytes` (four times the
 pause level by default), messages and all. Ordinary clients have no such
-hard limit, the same split real Redis makes with
+hard limit, the same split the reference implementation makes with
 `client-output-buffer-limit`.
 
 ## Resource limits are capped, but coarse
 
-`RedisServer` caps read buffer size, arguments per command, and total
+`CacheServer` caps read buffer size, arguments per command, and total
 connection count (see
 [PHASES.md](PHASES.md#phase-25--limits)) - but the buffer-size limit only
 catches a value that can *never* complete; a client sending many small,
@@ -137,7 +137,7 @@ an unauthenticated command channel - because that is exactly what it is.
 
 If one queued command in a transaction fails (a RESP error result -
 wrong argument count, for instance), `EXEC` still executes every command
-after it in the queue. Real Redis behaves the same way for runtime errors
+after it in the queue. The reference implementation behaves the same way for runtime errors
 inside `EXEC` (as opposed to a queue-time error, which aborts the whole
 transaction before `EXEC` is even reached) - there is no partial rollback
 in either implementation. This project does not currently distinguish the

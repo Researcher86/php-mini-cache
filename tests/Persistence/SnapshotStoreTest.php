@@ -15,7 +15,7 @@ final class SnapshotStoreTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->path = tempnam(sys_get_temp_dir(), 'mini-redis-snapshot-');
+        $this->path = tempnam(sys_get_temp_dir(), 'mini-cache-snapshot-');
     }
 
     protected function tearDown(): void

@@ -5,16 +5,16 @@ declare(strict_types=1);
 
 use PhpMiniCache\Connection\ClientConnection;
 use PhpMiniCache\Logging\ConsoleLogger;
-use PhpMiniCache\Server\RedisServer;
+use PhpMiniCache\Server\CacheServer;
 use PhpMiniCache\Server\ServerConfig;
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
-$host = getenv('REDIS_HOST') ?: '127.0.0.1';
-$port = (int) (getenv('REDIS_PORT') ?: 6380);
+$host = getenv('CACHE_HOST') ?: '127.0.0.1';
+$port = (int) (getenv('CACHE_PORT') ?: 6380);
 
 $logger = new ConsoleLogger();
-$server = new RedisServer(new ServerConfig(host: $host, port: $port), logger: $logger);
+$server = new CacheServer(new ServerConfig(host: $host, port: $port), logger: $logger);
 
 $logger->info(sprintf('Listening on %s', $server->localAddress()));
 

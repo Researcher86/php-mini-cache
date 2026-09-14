@@ -26,7 +26,7 @@ final readonly class ServerSocket
                 // busy reading replies has no reason to acknowledge
                 // promptly - so the second half of a pipeline's answers
                 // could sit in the kernel for a delayed-ACK's worth of time
-                // (~40 ms) before leaving. Real Redis disables it on every
+                // (~40 ms) before leaving. Disabled here on every
                 // connection for exactly this reason. Accepted sockets
                 // inherit the listener's context, so setting it here covers
                 // all of them.
