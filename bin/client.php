@@ -9,7 +9,7 @@ use PhpMiniCache\Sdk\CacheClient;
 use PhpMiniCache\Sdk\CacheClientException;
 use PhpMiniCache\Sdk\CommandFailedException;
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/bootstrap.php';
 
 /**
  * Turns a reply into the one line a terminal wants, which is the only part

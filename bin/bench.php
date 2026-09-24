@@ -6,7 +6,7 @@ declare(strict_types=1);
 use PhpMiniCache\Sdk\CacheClient;
 use PhpMiniCache\Sdk\CacheClientException;
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/bootstrap.php';
 
 /**
  * One client's share of the benchmark: a real connection, run

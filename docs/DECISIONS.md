@@ -400,3 +400,55 @@ satisfied, independent of the length asked for. `stream_set_chunk_size($client,
 then converges in 2-3 iterations. Worth remembering anywhere a test (or
 real client) needs to read back a large amount of data in bounded reads
 rather than one line at a time.
+
+---
+
+## `bin/*.php` couldn't run as an installed dependency
+
+Every entry point opened with `require dirname(__DIR__) . '/vendor/autoload.php'`,
+which only resolves while this repository IS the Composer root - installed
+as `vendor/tanat/php-mini-cache/`, that same relative path points at this
+package's own (nonexistent) `vendor/` and the script fatals immediately.
+`bin/bootstrap.php` now walks upward from its own directory until it finds
+a real `vendor/autoload.php` (this package's own when run from the
+repository root, the consuming project's when installed as a dependency),
+verifies the autoloader it found actually maps `PhpMiniCache\Server\CacheServer`
+rather than trusting the first match blindly, and `bin/server.php`,
+`bin/client.php` and `bin/bench.php` all require it instead. Verified
+against a real Composer path-repository install (a scratch consumer
+project requiring `tanat/php-mini-cache` from a `path` repository pointed
+at this one) - `bin/client.php` run from inside `vendor/tanat/php-mini-cache/bin/`
+now fails on "connection refused" (an application-level error) rather than
+a missing-autoloader fatal.
+
+## Daemon mode was not added, and the reason is worth recording precisely
+
+`php-mini-database`'s server has `start --daemon --pid-file --log-file`;
+this one doesn't, and porting that contract here was considered and
+investigated - `pcntl_fork()` + `posix_setsid()` to detach, a `PidFile` to
+make a liveness check and a second-instance guard possible.
+
+What stopped it wasn't a bug in that sequence. A minimal
+`pcntl_fork()` + `posix_setsid()` + `pcntl_signal(SIGTERM, ...)` script, no
+`CacheServer` and no application code at all, was used to isolate an
+earlier "SIGTERM doesn't reach a daemonized process" symptom (first
+observed in the sibling `php-worker-pool` project's own daemon-mode
+attempt - see that repository's `docs/DECISIONS.md`, "PidFile and
+FileLogger, without a daemon mode to use them," for the full
+investigation). Checked directly against `/proc/<pid>/status`: SIGTERM is
+delivered and handled within a millisecond, every time. The process then
+sits as an unreaped zombie indefinitely, because this project's own dev
+container's PID 1 is `php` itself - nothing in the container calls
+`wait()`/`waitpid()` on an orphaned child. `posix_kill($pid, 0)`, which is
+what a `PidFile`-style liveness check (and plain `kill -0`) would use,
+**returns true for a zombie** - so any such check reports a daemon that
+exited a millisecond after being asked to as still running, forever, in
+this exact environment.
+
+The fork/detach/signal-handling code itself is correct; the failure is
+specific to running a double-forked daemon under a container with nothing
+reaping orphans (no init, no `docker run --init`/`tini`, no supervisor).
+Rather than ship a `--daemon` flag whose liveness check silently lies in
+the one environment (a bare container) most likely to run it, the feature
+is left out here, matching the same call already made in
+`php-worker-pool`. `bin/*.php` stay foreground-only.

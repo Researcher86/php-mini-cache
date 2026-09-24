@@ -8,7 +8,7 @@ use PhpMiniCache\Logging\ConsoleLogger;
 use PhpMiniCache\Server\CacheServer;
 use PhpMiniCache\Server\ServerConfig;
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+require __DIR__ . '/bootstrap.php';
 
 $host = getenv('CACHE_HOST') ?: '127.0.0.1';
 $port = (int) (getenv('CACHE_PORT') ?: 6380);
