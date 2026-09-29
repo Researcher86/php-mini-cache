@@ -26,9 +26,19 @@ final readonly class ExecCommand implements CommandHandler
             return RespValue::error('ERR EXEC without MULTI');
         }
 
+        // Checked before drain(), which ends the watch: a watched key written
+        // since WATCH aborts the whole transaction with a null array - the
+        // caller's "someone got there first, nothing was applied".
+        $aborted = $this->transactions->isDirty($connection);
+        $queued = $this->transactions->drain($connection);
+
+        if ($aborted) {
+            return RespValue::array(null);
+        }
+
         $results = array_map(
             fn (Command $queued): RespValue => $this->dispatcher->dispatch($queued, $store, $connection),
-            $this->transactions->drain($connection),
+            $queued,
         );
 
         return RespValue::array($results);

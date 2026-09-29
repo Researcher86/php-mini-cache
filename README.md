@@ -123,7 +123,7 @@ make example NAME=slow-client            # a paused slow reader vs. an unaffecte
 | **TTL** | lazy expiration on access, plus active expiration on a repeating timer |
 | **Connection timeout** | idle connections are closed after a configurable period |
 | **Pub/Sub** | `SUBSCRIBE` / `PUBLISH`, delivered to every subscriber of a channel |
-| **Transactions** | `MULTI` / `EXEC` / `DISCARD`, queued per connection |
+| **Transactions** | `MULTI` / `EXEC` / `DISCARD`, queued per connection; `WATCH` / `UNWATCH` optimistic locking |
 | **Persistence** | optional snapshot to disk, reloaded on startup, written once more on the way out - in-memory-only unless configured |
 | **Graceful shutdown** | `SIGTERM`/`SIGINT` stop new connections and drain existing ones before exiting |
 | **Limits** | capped read buffer size, arguments per command, and connection count - each replies with a RESP error instead of growing unbounded |
@@ -856,6 +856,23 @@ DISCARD (cancel it)
 
 Queuing and execution are per connection - one client's `MULTI` has no
 effect on another's commands. See [Transactions](#transactions) below.
+
+## WATCH / UNWATCH
+
+```text
+WATCH key [key ...]   (before MULTI)
+MULTI ... EXEC        -> *-1 (null array) if any watched key was written since WATCH
+UNWATCH               (forget the watches; EXEC and DISCARD also end them)
+```
+
+Redis's check-and-set. A write by anyone - `SET`, `INCR`, and `DEL` **even of
+a key that does not exist** - aborts the watcher's next `EXEC`. That last
+part differs from Redis on purpose: it is what closes the cache-aside race
+(reader misses and watches, writer updates the database and deletes the
+absent key, reader's fill of the old row is then refused). `WATCH` inside
+`MULTI` is an error. The SDK exposes it as `watch()`, `unwatch()` and
+`setIfUnchanged()`, and refuses a transaction if the watched connection was
+lost in between, rather than running it unguarded on a new one.
 
 ---
 

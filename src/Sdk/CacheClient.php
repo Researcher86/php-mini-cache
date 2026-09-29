@@ -54,6 +54,17 @@ final class CacheClient
 
     private bool $inTransaction = false;
 
+    /**
+     * Counts the sockets this client has opened. A WATCH lives on the server
+     * side of one connection, and this client reconnects silently on the
+     * next command after a drop - so the connection a watch was set on is
+     * remembered, and a transaction on any other one is refused rather than
+     * run unguarded.
+     */
+    private int $connectionNumber = 0;
+
+    private ?int $watchedOnConnection = null;
+
     public function __construct(
         private readonly string $host = '127.0.0.1',
         private readonly int $port = 6380,
@@ -186,6 +197,12 @@ final class CacheClient
      */
     public function multi(): void
     {
+        if ($this->watchedOnConnection !== null && ($this->watchedOnConnection !== $this->connectionNumber || !is_resource($this->socket))) {
+            $this->watchedOnConnection = null;
+
+            throw new ConnectionLostException('The connection was lost after WATCH, and the watch with it.');
+        }
+
         $this->command('MULTI');
         $this->inTransaction = true;
     }
@@ -207,16 +224,56 @@ final class CacheClient
      * transaction's commands need not have anything in common - a GET's
      * bulk string next to an INCR's integer.
      *
-     * @return list<RespValue>
+     * @return list<RespValue>|null null when a key passed to watch() was
+     *                              written since, so nothing was run
      *
      * @throws CacheClientException
      */
-    public function exec(): array
+    public function exec(): ?array
     {
         $reply = $this->command('EXEC');
         $this->inTransaction = false;
+        $this->watchedOnConnection = null;
 
-        return is_array($reply->value) ? $reply->value : [];
+        return is_array($reply->value) ? $reply->value : null;
+    }
+
+    /**
+     * Optimistic lock: the next exec() on this connection runs only if none
+     * of $keys is written (SET, DEL - even of a missing key - INCR) by
+     * anyone before it; otherwise exec() returns null. Must come before
+     * multi().
+     *
+     * @throws CacheClientException
+     */
+    public function watch(string $key, string ...$more): void
+    {
+        $this->command('WATCH', $key, ...$more);
+        $this->watchedOnConnection = $this->connectionNumber;
+    }
+
+    /** @throws CacheClientException */
+    public function unwatch(): void
+    {
+        $this->command('UNWATCH');
+        $this->watchedOnConnection = null;
+    }
+
+    /**
+     * SET, but only if nothing wrote $key since this connection's watch($key):
+     * the cache-aside fill. Returns false when the write was abandoned
+     * because the key changed (typically a writer's DEL after an update).
+     *
+     * @throws CacheClientException
+     */
+    public function setIfUnchanged(string $key, string $value, ?int $ttlSeconds = null): bool
+    {
+        $this->multi();
+        $ttlSeconds === null
+            ? $this->queue('SET', $key, $value)
+            : $this->queue('SET', $key, $value, 'EX', (string) $ttlSeconds);
+
+        return $this->exec() !== null;
     }
 
     /** @throws CacheClientException */
@@ -224,6 +281,7 @@ final class CacheClient
     {
         $this->command('DISCARD');
         $this->inTransaction = false;
+        $this->watchedOnConnection = null;
     }
 
     public function inTransaction(): bool
@@ -499,6 +557,7 @@ final class CacheClient
         // controls: a server that stops answering costs $timeoutSeconds,
         // not the rest of the process's life.
         stream_set_blocking($socket, false);
+        $this->connectionNumber++;
 
         return $this->socket = $socket;
     }

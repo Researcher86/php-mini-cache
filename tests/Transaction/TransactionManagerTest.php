@@ -84,6 +84,56 @@ final class TransactionManagerTest extends TestCase
     }
 
     /** @param list<string> $arguments */
+    public function testAWriteToAWatchedKeyMarksTheWatcherDirty(): void
+    {
+        $transactions = new TransactionManager();
+        $watcher = $this->createConnection();
+        $bystander = $this->createConnection();
+
+        $transactions->watch($watcher, 'k');
+        self::assertFalse($transactions->isDirty($watcher));
+
+        $transactions->touch('other');
+        self::assertFalse($transactions->isDirty($watcher));
+
+        $transactions->touch('k');
+        self::assertTrue($transactions->isDirty($watcher));
+        self::assertFalse($transactions->isDirty($bystander));
+    }
+
+    public function testExecAndDiscardEndTheWatch(): void
+    {
+        $transactions = new TransactionManager();
+        $connection = $this->createConnection();
+
+        $transactions->watch($connection, 'k');
+        $transactions->touch('k');
+        $transactions->begin($connection);
+        $transactions->drain($connection);
+
+        self::assertFalse($transactions->isDirty($connection));
+        $transactions->touch('k');
+        self::assertFalse($transactions->isDirty($connection), 'a drained transaction no longer watches');
+
+        $transactions->watch($connection, 'k');
+        $transactions->discard($connection);
+        $transactions->touch('k');
+        self::assertFalse($transactions->isDirty($connection), 'a discarded transaction no longer watches');
+    }
+
+    public function testUnwatchForgetsEveryKey(): void
+    {
+        $transactions = new TransactionManager();
+        $connection = $this->createConnection();
+
+        $transactions->watch($connection, 'a', 'b');
+        $transactions->unwatch($connection);
+        $transactions->touch('a');
+        $transactions->touch('b');
+
+        self::assertFalse($transactions->isDirty($connection));
+    }
+
     private function command(string $name, array $arguments = []): Command
     {
         $elements = array_map(RespValue::bulkString(...), [$name, ...$arguments]);

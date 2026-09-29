@@ -9,6 +9,7 @@ use PhpMiniCache\Sdk\CacheClient;
 use PhpMiniCache\Sdk\CacheClientException;
 use PhpMiniCache\Sdk\CommandFailedException;
 use PhpMiniCache\Sdk\ConnectionFailedException;
+use PhpMiniCache\Sdk\ConnectionLostException;
 use PhpMiniCache\Server\CacheServer;
 use PhpMiniCache\Server\ServerConfig;
 use PhpMiniCache\Tests\Support\FreePort;
@@ -193,6 +194,91 @@ final class CacheClientTest extends TestCase
 
         self::assertFalse($this->client->inTransaction());
         self::assertSame('1', $this->client->get('counter'));
+    }
+
+    public function testSetIfUnchangedWritesWhenNothingTouchedTheWatchedKey(): void
+    {
+        $this->client->watch('order:1');
+
+        self::assertTrue($this->client->setIfUnchanged('order:1', 'fresh', 60));
+        self::assertSame('fresh', $this->client->get('order:1'));
+    }
+
+    /**
+     * The cache-aside race WATCH exists to close here: a reader misses and
+     * watches, a writer updates the row and deletes the key - which is not
+     * there - and the reader's fill with the row it read before the update
+     * must be dropped, not stored.
+     */
+    public function testADeleteOfAMissingWatchedKeyAbortsTheFill(): void
+    {
+        $this->client->watch('order:1');
+
+        self::assertSame(0, $this->newClient()->delete('order:1'));
+
+        self::assertFalse($this->client->setIfUnchanged('order:1', 'stale', 60));
+        self::assertNull($this->client->get('order:1'));
+    }
+
+    public function testASetByAnotherClientAbortsTheTransaction(): void
+    {
+        $this->client->watch('counter');
+        $this->newClient()->set('counter', '5');
+
+        $this->client->multi();
+        $this->client->queue('SET', 'counter', '1');
+
+        self::assertNull($this->client->exec());
+        self::assertSame('5', $this->client->get('counter'));
+    }
+
+    public function testAWatchEndsWithExecSoTheNextTransactionIsUnguarded(): void
+    {
+        $this->client->watch('k');
+        self::assertTrue($this->client->setIfUnchanged('k', 'a'));
+
+        $this->newClient()->set('k', 'b');
+
+        self::assertTrue($this->client->setIfUnchanged('k', 'c'));
+        self::assertSame('c', $this->client->get('k'));
+    }
+
+    public function testUnwatchForgetsTheWatchedKeys(): void
+    {
+        $this->client->watch('k');
+        $this->client->unwatch();
+        $this->newClient()->set('k', 'other');
+
+        self::assertTrue($this->client->setIfUnchanged('k', 'mine'));
+    }
+
+    public function testWatchInsideMultiIsRefused(): void
+    {
+        $this->client->multi();
+
+        $this->expectException(CommandFailedException::class);
+        $this->expectExceptionMessage('WATCH inside MULTI');
+
+        $this->client->watch('k');
+    }
+
+    /**
+     * The watch lives on the server side of one connection. After a drop
+     * the client would reconnect silently, so the guarded transaction must
+     * be refused instead of run on a connection that watches nothing.
+     */
+    public function testATransactionAfterTheWatchedConnectionWasLostIsRefused(): void
+    {
+        $this->client->watch('k');
+        $this->client->close();
+
+        try {
+            $this->client->setIfUnchanged('k', 'unguarded');
+            self::fail('Expected the lost watch to be reported.');
+        } catch (ConnectionLostException) {
+        }
+
+        self::assertNull($this->client->get('k'));
     }
 
     public function testAPublishedMessageReachesASubscribedClient(): void

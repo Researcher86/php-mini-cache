@@ -13,6 +13,8 @@ use PhpMiniCache\Command\Handler\InfoCommand;
 use PhpMiniCache\Command\Handler\MultiCommand;
 use PhpMiniCache\Command\Handler\PublishCommand;
 use PhpMiniCache\Command\Handler\SubscribeCommand;
+use PhpMiniCache\Command\Handler\UnwatchCommand;
+use PhpMiniCache\Command\Handler\WatchCommand;
 use PhpMiniCache\Connection\ClientConnection;
 use PhpMiniCache\Connection\ConnectionManager;
 use PhpMiniCache\Connection\ConnectionState;
@@ -33,6 +35,7 @@ use PhpMiniCache\Storage\InMemoryStore;
 use PhpMiniCache\Storage\Store;
 use PhpMiniCache\Support\Clock;
 use PhpMiniCache\Support\SystemClock;
+use PhpMiniCache\Transaction\KeyWatchingStore;
 use PhpMiniCache\Transaction\TransactionManager;
 
 /**
@@ -84,6 +87,8 @@ final class CacheServer
     private readonly RespEncoder $encoder;
     private readonly ChannelRegistry $channels;
     private readonly TransactionManager $transactions;
+
+    private readonly KeyWatchingStore $commandStore;
     private readonly ?SnapshotStore $snapshots;
     private readonly ?ForkingSnapshotWorker $snapshotWorker;
     private readonly ServerMetrics $metrics;
@@ -177,11 +182,17 @@ final class CacheServer
         ));
 
         // Transactions: MULTI/EXEC/DISCARD need to intercept normal command
-        // execution (queue instead of run), handled in executeValue().
+        // execution (queue instead of run), handled in execute(). WATCH needs
+        // to see every write, so commands run against a store that reports
+        // them (KeyWatchingStore) while $this->store stays the plain one the
+        // snapshots and the sweep use.
         $this->transactions = new TransactionManager();
         $this->dispatcher->register('MULTI', new MultiCommand($this->transactions));
         $this->dispatcher->register('DISCARD', new DiscardCommand($this->transactions));
         $this->dispatcher->register('EXEC', new ExecCommand($this->transactions, $this->dispatcher));
+        $this->dispatcher->register('WATCH', new WatchCommand($this->transactions));
+        $this->dispatcher->register('UNWATCH', new UnwatchCommand($this->transactions));
+        $this->commandStore = new KeyWatchingStore($this->store, $this->transactions);
 
         $this->dispatcher->register('INFO', new InfoCommand($this->metrics, $this->connections, $this->eventLoop->metrics()));
 
@@ -527,11 +538,11 @@ final class CacheServer
                 $this->metrics->recordUnknownCommand();
             }
 
-            if ($this->transactions->isActive($connection) && !in_array($command->name, ['MULTI', 'EXEC', 'DISCARD'], true)) {
+            if ($this->transactions->isActive($connection) && !in_array($command->name, ['MULTI', 'EXEC', 'DISCARD', 'WATCH'], true)) {
                 $this->transactions->queue($connection, $command);
                 $result = RespValue::simpleString('QUEUED');
             } else {
-                $result = $this->dispatcher->dispatch($command, $this->store, $connection);
+                $result = $this->dispatcher->dispatch($command, $this->commandStore, $connection);
             }
         } catch (CommandException $exception) {
             $result = RespValue::error('ERR ' . $exception->getMessage());

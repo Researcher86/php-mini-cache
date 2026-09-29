@@ -1260,7 +1260,7 @@ Restore State
 | `CommandHandler` implementations | Execute one command's logic                 |
 | `Store` / `InMemoryStore`     | Store key-value data, with TTL                 |
 | `ChannelRegistry`             | Manage Pub/Sub channels and subscribers        |
-| `TransactionManager`          | Per-connection MULTI/EXEC/DISCARD queue        |
+| `TransactionManager`          | Per-connection MULTI/EXEC/DISCARD queue, WATCH |
 | `SnapshotStore`               | Write the store to disk and read it back       |
 | `ForkingSnapshotWorker`       | Take that snapshot in a child, off the loop    |
 | `ServerMetrics`               | Count connections, commands, bytes, errors     |
