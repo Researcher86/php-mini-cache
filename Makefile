@@ -45,9 +45,9 @@ run-client-debug: up
 bench: up
 	docker compose exec php php bin/bench.php $(ARGS)
 
-# make example NAME=ttl  (also: pipelining, pubsub, slow-client)
+# make example EXAMPLE=ttl  (also: pipelining, pubsub, slow-client)
 example: up
-	docker compose exec php php examples/$(NAME).php
+	docker compose exec php php examples/$(EXAMPLE).php
 
 format: up
 	docker compose exec php composer format

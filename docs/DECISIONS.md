@@ -407,7 +407,7 @@ rather than one line at a time.
 
 Every entry point opened with `require dirname(__DIR__) . '/vendor/autoload.php'`,
 which only resolves while this repository IS the Composer root - installed
-as `vendor/tanat/php-mini-cache/`, that same relative path points at this
+as `vendor/researcher86/php-mini-cache/`, that same relative path points at this
 package's own (nonexistent) `vendor/` and the script fatals immediately.
 `bin/bootstrap.php` now walks upward from its own directory until it finds
 a real `vendor/autoload.php` (this package's own when run from the
@@ -416,8 +416,8 @@ verifies the autoloader it found actually maps `PhpMiniCache\Server\CacheServer`
 rather than trusting the first match blindly, and `bin/server.php`,
 `bin/client.php` and `bin/bench.php` all require it instead. Verified
 against a real Composer path-repository install (a scratch consumer
-project requiring `tanat/php-mini-cache` from a `path` repository pointed
-at this one) - `bin/client.php` run from inside `vendor/tanat/php-mini-cache/bin/`
+project requiring `researcher86/php-mini-cache` from a `path` repository pointed
+at this one) - `bin/client.php` run from inside `vendor/researcher86/php-mini-cache/bin/`
 now fails on "connection refused" (an application-level error) rather than
 a missing-autoloader fatal.
 
