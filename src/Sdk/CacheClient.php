@@ -79,19 +79,13 @@ final class CacheClient
     /** @throws CacheClientException */
     public function ping(?string $message = null): string
     {
-        $reply = $message === null
-            ? $this->command('PING')
-            : $this->command('PING', $message);
-
-        return (string) $reply->value;
+        return (string) $this->command('PING', ...($message === null ? [] : [$message]))->value;
     }
 
     /** @throws CacheClientException */
     public function set(string $key, string $value, ?int $ttlSeconds = null): void
     {
-        $ttlSeconds === null
-            ? $this->command('SET', $key, $value)
-            : $this->command('SET', $key, $value, 'EX', (string) $ttlSeconds);
+        $this->command(...self::setArguments($key, $value, $ttlSeconds));
     }
 
     /**
@@ -277,9 +271,7 @@ final class CacheClient
     public function setIfUnchanged(string $key, string $value, ?int $ttlSeconds = null): bool
     {
         $this->multi();
-        $ttlSeconds === null
-            ? $this->queue('SET', $key, $value)
-            : $this->queue('SET', $key, $value, 'EX', (string) $ttlSeconds);
+        $this->queue(...self::setArguments($key, $value, $ttlSeconds));
 
         return $this->exec() !== null;
     }
@@ -420,7 +412,7 @@ final class CacheClient
             $bytes = substr($bytes, $written);
 
             if ($bytes !== '') {
-                $this->awaitWritable($socket, $deadline);
+                $this->await($socket, $deadline, forWriting: true);
             }
         }
     }
@@ -459,7 +451,7 @@ final class CacheClient
     private function readChunk(float $deadline): string
     {
         $socket = $this->connection();
-        $this->awaitReadable($socket, $deadline);
+        $this->await($socket, $deadline);
 
         $chunk = @fread($socket, 65536);
 
@@ -476,54 +468,44 @@ final class CacheClient
     }
 
     /**
+     * Waits until $socket is readable or writable ($forWriting), up to
+     * $deadline.
+     *
      * @param resource $socket
      *
      * @throws ReplyTimedOutException
      */
-    private function awaitReadable(mixed $socket, float $deadline): void
+    private function await(mixed $socket, float $deadline, bool $forWriting = false): void
     {
-        $read = [$socket];
-        $write = [];
-
-        if (!$this->select($read, $write, $deadline)) {
-            throw new ReplyTimedOutException(
-                sprintf('No reply within %.3f seconds.', $this->timeoutSeconds),
-            );
-        }
-    }
-
-    /**
-     * @param resource $socket
-     *
-     * @throws ReplyTimedOutException
-     */
-    private function awaitWritable(mixed $socket, float $deadline): void
-    {
-        $read = [];
-        $write = [$socket];
-
-        if (!$this->select($read, $write, $deadline)) {
-            throw new ReplyTimedOutException(
-                sprintf('The server stopped accepting bytes within %.3f seconds.', $this->timeoutSeconds),
-            );
-        }
-    }
-
-    /**
-     * @param list<resource> $read
-     * @param list<resource> $write
-     */
-    private function select(array $read, array $write, float $deadline): bool
-    {
-        $remaining = max(0.0, $deadline - microtime(true));
+        $read = $forWriting ? [] : [$socket];
+        $write = $forWriting ? [$socket] : [];
         $except = null;
+        $remaining = max(0.0, $deadline - microtime(true));
 
         // stream_select() takes whole seconds plus a microsecond remainder,
         // not one float - the same split SelectLoop makes on the server side.
         $seconds = (int) floor($remaining);
         $microseconds = (int) (($remaining - $seconds) * 1_000_000);
 
-        return (bool) @stream_select($read, $write, $except, $seconds, $microseconds);
+        if (!@stream_select($read, $write, $except, $seconds, $microseconds)) {
+            throw new ReplyTimedOutException(sprintf(
+                '%s within %.3f seconds.',
+                $forWriting ? 'The server stopped accepting bytes' : 'No reply',
+                $this->timeoutSeconds,
+            ));
+        }
+    }
+
+    /**
+     * SET's arguments, with the EX option only when a TTL is given.
+     *
+     * @return list<string>
+     */
+    private static function setArguments(string $key, string $value, ?int $ttlSeconds): array
+    {
+        return $ttlSeconds === null
+            ? ['SET', $key, $value]
+            : ['SET', $key, $value, 'EX', (string) $ttlSeconds];
     }
 
     private function deadline(?float $timeoutSeconds): float
