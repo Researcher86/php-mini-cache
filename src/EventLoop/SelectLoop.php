@@ -143,17 +143,9 @@ final class SelectLoop implements EventLoop
      */
     private function forgetClosedStreams(): void
     {
-        foreach ($this->readListeners as $id => [$stream]) {
-            if (!is_resource($stream)) {
-                unset($this->readListeners[$id]);
-            }
-        }
-
-        foreach ($this->writeListeners as $id => [$stream]) {
-            if (!is_resource($stream)) {
-                unset($this->writeListeners[$id]);
-            }
-        }
+        $isOpen = static fn (array $entry): bool => is_resource($entry[0]);
+        $this->readListeners = array_filter($this->readListeners, $isOpen);
+        $this->writeListeners = array_filter($this->writeListeners, $isOpen);
     }
 
     /**

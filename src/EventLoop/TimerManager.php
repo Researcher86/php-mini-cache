@@ -17,10 +17,7 @@ final class TimerManager
      */
     public function every(float $intervalSeconds, callable $callback, float $now): Timer
     {
-        $timer = new Timer($now + $intervalSeconds, $intervalSeconds, $callback, repeating: true);
-        $this->timers[] = $timer;
-
-        return $timer;
+        return $this->timers[] = new Timer($now + $intervalSeconds, $intervalSeconds, $callback, repeating: true);
     }
 
     /**
@@ -28,10 +25,7 @@ final class TimerManager
      */
     public function after(float $delaySeconds, callable $callback, float $now): Timer
     {
-        $timer = new Timer($now + $delaySeconds, $delaySeconds, $callback, repeating: false);
-        $this->timers[] = $timer;
-
-        return $timer;
+        return $this->timers[] = new Timer($now + $delaySeconds, $delaySeconds, $callback, repeating: false);
     }
 
     /**
