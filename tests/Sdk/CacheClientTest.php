@@ -281,6 +281,26 @@ final class CacheClientTest extends TestCase
         self::assertNull($this->client->get('k'));
     }
 
+    /**
+     * Same reasoning for MULTI itself: it is server-side state of one
+     * connection. A queue() after the drop would reconnect and run the
+     * command on the spot - applied outside any transaction, its reply
+     * thrown away - so it must be refused instead.
+     */
+    public function testQueueAfterTheTransactionsConnectionWasLostIsRefused(): void
+    {
+        $this->client->multi();
+        $this->client->close();
+
+        try {
+            $this->client->queue('SET', 'k', 'outside');
+            self::fail('Expected the lost transaction to be reported.');
+        } catch (ConnectionLostException) {
+        }
+
+        self::assertNull($this->client->get('k'));
+    }
+
     public function testAPublishedMessageReachesASubscribedClient(): void
     {
         $subscriber = $this->newClient();

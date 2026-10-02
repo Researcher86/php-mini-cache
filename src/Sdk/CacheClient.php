@@ -211,10 +211,18 @@ final class CacheClient
      * Adds one command to the open transaction. The server replies
      * `+QUEUED`; the actual result arrives in exec()'s array.
      *
+     * Refused when no transaction is open - never started, or lost along
+     * with the connection it lived on. Sent anyway, the command would run
+     * immediately on a fresh connection and its reply would be discarded.
+     *
      * @throws CacheClientException
      */
     public function queue(string $name, string ...$arguments): void
     {
+        if (!$this->inTransaction) {
+            throw new ConnectionLostException('No transaction is open on this connection: multi() was not called, or the connection was lost since.');
+        }
+
         $this->command($name, ...$arguments);
     }
 
