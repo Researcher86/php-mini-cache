@@ -46,8 +46,8 @@ final class ForkingSnapshotWorker
 
     /**
      * Returns false when a snapshot was already being written and this one
-     * was skipped, the way concurrent snapshot writes are refused by design
-     * progress.
+     * was skipped: at most one background snapshot is in progress at a
+     * time.
      *
      * Skipping matters because the interval between snapshots is configured,
      * while how long one takes is not: a store big enough to outlast its own

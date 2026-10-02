@@ -67,7 +67,6 @@ final class ClientConnection
         $this->touch();
     }
 
-
     public function lastActivityAt(): float
     {
         return $this->lastActivityAt;
