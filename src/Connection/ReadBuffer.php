@@ -31,13 +31,11 @@ final class ReadBuffer
     }
 
     /**
-     * Removes and returns the first $length bytes.
+     * Drops the first $length bytes - the ones a parser has already turned
+     * into values.
      */
-    public function consume(int $length): string
+    public function consume(int $length): void
     {
-        $chunk = substr($this->buffer, 0, $length);
         $this->buffer = substr($this->buffer, $length);
-
-        return $chunk;
     }
 }

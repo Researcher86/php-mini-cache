@@ -33,9 +33,8 @@ final class ReadBufferTest extends TestCase
         $buffer = new ReadBuffer();
         $buffer->append('SET foo bar');
 
-        $chunk = $buffer->consume(4);
+        $buffer->consume(4);
 
-        self::assertSame('SET ', $chunk);
         self::assertSame('foo bar', $buffer->contents());
     }
 }
