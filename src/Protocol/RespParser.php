@@ -34,9 +34,9 @@ final readonly class RespParser
      *     own, so divergence here is stopped while it is still shallow.
      */
     public function __construct(
-        private readonly int $maxBulkStringBytes = 1024 * 1024,
-        private readonly int $maxArrayElements = 1_000_000,
-        private readonly int $maxNestingDepth = 32,
+        private int $maxBulkStringBytes = 1024 * 1024,
+        private int $maxArrayElements = 1_000_000,
+        private int $maxNestingDepth = 32,
     ) {
     }
 
@@ -72,7 +72,7 @@ final readonly class RespParser
             '+' => [RespValue::simpleString($content), $pos],
             '-' => [RespValue::error($content), $pos],
             ':' => [RespValue::integer($this->parseStrictInt($content, 'integer')), $pos],
-            '$' => $this->parseBulkString($buffer, $pos, $this->parseLength($content, 'bulk string'), $depth),
+            '$' => $this->parseBulkString($buffer, $pos, $this->parseLength($content, 'bulk string')),
             '*' => $this->parseArray($buffer, $pos, $this->parseLength($content, 'array'), $depth),
             default => throw new ProtocolException(sprintf('Unknown RESP type byte "%s".', $type)),
         };
@@ -102,10 +102,6 @@ final readonly class RespParser
     {
         $length = $this->parseStrictInt($content, $what . ' length');
 
-        if ($length === -1) {
-            return -1;
-        }
-
         if ($length < -1) {
             throw new ProtocolException(sprintf('Invalid %s length: %s.', $what, $content));
         }
@@ -134,7 +130,7 @@ final readonly class RespParser
     }
 
     /** @return array{0: RespValue, 1: int}|null */
-    private function parseBulkString(string $buffer, int $pos, int $length, int $depth): ?array
+    private function parseBulkString(string $buffer, int $pos, int $length): ?array
     {
         if ($length === -1) {
             return [RespValue::bulkString(null), $pos];
