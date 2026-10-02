@@ -174,12 +174,7 @@ final class CacheServer
         // CommandHandlers don't otherwise have a way to do.
         $this->channels = new ChannelRegistry();
         $this->dispatcher->register('SUBSCRIBE', new SubscribeCommand($this->channels));
-        $this->dispatcher->register('PUBLISH', new PublishCommand(
-            $this->channels,
-            function (ClientConnection $subscriber, string $payload): void {
-                $this->deliverToSubscriber($subscriber, $payload);
-            },
-        ));
+        $this->dispatcher->register('PUBLISH', new PublishCommand($this->channels, $this->deliverToSubscriber(...)));
 
         // Transactions: MULTI/EXEC/DISCARD need to intercept normal command
         // execution (queue instead of run), handled in execute(). WATCH needs
@@ -203,15 +198,11 @@ final class CacheServer
         });
 
         if ($this->idleTimeoutSeconds !== null) {
-            $this->eventLoop->every($this->idleTimeoutSeconds, function (): void {
-                $this->closeIdleConnections();
-            });
+            $this->eventLoop->every($this->idleTimeoutSeconds, $this->closeIdleConnections(...));
         }
 
         if ($this->snapshots !== null && $snapshotIntervalSeconds !== null) {
-            $this->eventLoop->every($snapshotIntervalSeconds, function (): void {
-                $this->saveSnapshot();
-            });
+            $this->eventLoop->every($snapshotIntervalSeconds, $this->saveSnapshot(...));
         }
     }
 
@@ -377,12 +368,8 @@ final class CacheServer
         // it.
         pcntl_async_signals(true);
 
-        pcntl_signal(SIGTERM, function (): void {
-            $this->requestShutdown();
-        });
-        pcntl_signal(SIGINT, function (): void {
-            $this->requestShutdown();
-        });
+        pcntl_signal(SIGTERM, $this->requestShutdown(...));
+        pcntl_signal(SIGINT, $this->requestShutdown(...));
 
         // Reap forked snapshot children so they don't linger as zombies.
         pcntl_signal(SIGCHLD, function (): void {
@@ -630,9 +617,7 @@ final class CacheServer
 
         // Still holding bytes: come back when the socket has room again,
         // rather than blocking on a peer that is not reading.
-        $this->eventLoop->onWritable($connection->socket(), function () use ($connection): void {
-            $this->flushWriteBuffer($connection);
-        });
+        $this->eventLoop->onWritable($connection->socket(), fn () => $this->flushWriteBuffer($connection));
     }
 
     /**
@@ -648,7 +633,7 @@ final class CacheServer
             return;
         }
 
-        if (isset($this->pausedConnections[$connection->id()])) {
+        if ($this->isPaused($connection)) {
             return;
         }
 
