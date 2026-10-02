@@ -1386,6 +1386,27 @@ final class CacheServerTest extends TestCase
         }
     }
 
+    public function testAnUnknownCommandNameWithALineBreakCannotForgeASecondReply(): void
+    {
+        $loop = new SelectLoop();
+        $server = new CacheServer(new ServerConfig(host: '127.0.0.1', port: 0), $loop);
+
+        try {
+            $client = @stream_socket_client('tcp://' . $server->localAddress(), $errno, $errstr, 5);
+            self::assertIsResource($client, $errstr);
+            $server->acceptClient(5);
+
+            fwrite($client, "*1\r\n\$6\r\nx\r\n+OK\r\n");
+            $loop->tick(1);
+
+            self::assertSame("-ERR unknown command 'x  +ok'\r\n", fread($client, 1024));
+
+            fclose($client);
+        } finally {
+            $server->stop();
+        }
+    }
+
     /**
      * A gap between two otherwise well-tested phases: Phase 19's idle
      * timeout and Phase 20's Pub/Sub each have their own coverage, but

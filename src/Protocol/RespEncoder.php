@@ -9,12 +9,24 @@ final readonly class RespEncoder
     public function encode(RespValue $value): string
     {
         return match ($value->type) {
-            RespType::SimpleString => '+' . $value->value . "\r\n",
-            RespType::Error => '-' . $value->value . "\r\n",
+            RespType::SimpleString => '+' . $this->singleLine($value->value) . "\r\n",
+            RespType::Error => '-' . $this->singleLine($value->value) . "\r\n",
             RespType::Integer => ':' . $value->value . "\r\n",
             RespType::BulkString => $this->encodeBulkString($value->value),
             RespType::Array => $this->encodeArray($value->value),
         };
+    }
+
+    /**
+     * A simple string or error ends at the first CRLF, and its text can carry
+     * bytes a client chose (an unknown command's name, a malformed header).
+     * Written raw, a line break in it ends the reply early and turns the rest
+     * into a forged reply of its own, so CR and LF become spaces instead.
+     */
+    private function singleLine(mixed $text): string
+    {
+        /** @var string $text RespValue::simpleString()/error() only ever hold a string. */
+        return strtr($text, "\r\n", '  ');
     }
 
     private function encodeBulkString(mixed $value): string

@@ -63,4 +63,18 @@ final class RespEncoderTest extends TestCase
 
         self::assertSame("*-1\r\n", $encoder->encode(RespValue::array(null)));
     }
+
+    /**
+     * A simple string or error is one line by definition, and its text can
+     * carry client-chosen bytes (an unknown command's name, a bad header).
+     * Left raw, a CR or LF in it ends the line early and the rest is read
+     * as a reply of its own - "-ERR ...'x" followed by a forged "+OK".
+     */
+    public function testLineBreaksInsideSimpleStringsAndErrorsAreFlattenedToSpaces(): void
+    {
+        $encoder = new RespEncoder();
+
+        self::assertSame("-ERR unknown command 'x  +ok'\r\n", $encoder->encode(RespValue::error("ERR unknown command 'x\r\n+ok'")));
+        self::assertSame("+a b c\r\n", $encoder->encode(RespValue::simpleString("a\rb\nc")));
+    }
 }
