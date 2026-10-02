@@ -35,12 +35,7 @@ final class InMemoryStore implements Store
 
     public function set(string $key, mixed $value, ?int $ttlSeconds = null): void
     {
-        $expiresAt = $ttlSeconds === null ? null : $this->clock->now() + $ttlSeconds;
-        $this->data[$key] = new StoredValue($value, $expiresAt);
-
-        if ($expiresAt !== null) {
-            $this->expirations->insert([$expiresAt, $key]);
-        }
+        $this->put($key, $value, $ttlSeconds === null ? null : $this->clock->now() + $ttlSeconds);
     }
 
     public function setKeepingTtl(string $key, mixed $value): bool
@@ -61,9 +56,7 @@ final class InMemoryStore implements Store
 
     public function get(string $key): mixed
     {
-        $entry = $this->entryOrNull($key);
-
-        return $entry?->value;
+        return $this->entryOrNull($key)?->value;
     }
 
     public function has(string $key): bool
@@ -150,11 +143,17 @@ final class InMemoryStore implements Store
                 continue;
             }
 
-            $this->data[$key] = new StoredValue($entry['value'], $expiresAt);
+            $this->put($key, $entry['value'], $expiresAt);
+        }
+    }
 
-            if ($expiresAt !== null) {
-                $this->expirations->insert([$expiresAt, $key]);
-            }
+    /** Stores an entry and, if it expires, queues it for the sweep. */
+    private function put(string $key, mixed $value, ?float $expiresAt): void
+    {
+        $this->data[$key] = new StoredValue($value, $expiresAt);
+
+        if ($expiresAt !== null) {
+            $this->expirations->insert([$expiresAt, $key]);
         }
     }
 
