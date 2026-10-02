@@ -1008,6 +1008,61 @@ final class CacheServerTest extends TestCase
         self::assertSame(0, $server->connectedClientCount());
     }
 
+    /**
+     * Regression: requestShutdown() used to run inside the async signal
+     * handler itself. A SIGTERM landing while TimerManager::tick() rebuilt
+     * its timer list lost the shutdown checker it registered, and the server
+     * - no longer accepting - never stopped. Hundreds of busy timers keep the
+     * loop inside tick() most of the time, which is what makes the window
+     * wide enough to hit; on the old code most runs of this test hang a
+     * round.
+     */
+    public function testSigtermWhileTheLoopIsBusyFiringTimersStillStopsTheServer(): void
+    {
+        $hung = 0;
+
+        for ($round = 0; $round < 20; $round++) {
+            $pid = pcntl_fork();
+            self::assertNotSame(-1, $pid, 'pcntl_fork() failed');
+
+            if ($pid === 0) {
+                pcntl_alarm(15);
+
+                $loop = new SelectLoop();
+
+                for ($i = 0; $i < 300; $i++) {
+                    $loop->every(0.0005, static function (): void {
+                    });
+                }
+
+                new CacheServer(new ServerConfig(host: '127.0.0.1', port: 0), $loop, shutdownGraceSeconds: 0.1)->run();
+
+                // Never return into PHPUnit: the child would go on to run
+                // the rest of the suite as a second test runner.
+                exit(0);
+            }
+
+            usleep(random_int(50_000, 150_000));
+            posix_kill($pid, SIGTERM);
+
+            $deadline = microtime(true) + 3.0;
+
+            while (pcntl_waitpid($pid, $status, WNOHANG) === 0) {
+                if (microtime(true) >= $deadline) {
+                    $hung++;
+                    posix_kill($pid, SIGKILL);
+                    pcntl_waitpid($pid, $status);
+
+                    break;
+                }
+
+                usleep(10_000);
+            }
+        }
+
+        self::assertSame(0, $hung, sprintf('%d of 20 servers never finished shutting down after SIGTERM.', $hung));
+    }
+
     public function testAConnectionOverTheLimitIsRejectedWithARespErrorAndClosed(): void
     {
         $loop = new SelectLoop();

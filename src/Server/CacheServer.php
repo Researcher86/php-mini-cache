@@ -37,6 +37,7 @@ use PhpMiniCache\Support\Clock;
 use PhpMiniCache\Support\SystemClock;
 use PhpMiniCache\Transaction\KeyWatchingStore;
 use PhpMiniCache\Transaction\TransactionManager;
+use RuntimeException;
 
 /**
  * Accepts TCP clients through an EventLoop, parses complete RESP values
@@ -359,17 +360,43 @@ final class CacheServer
     /**
      * Reacts to SIGTERM/SIGINT with requestShutdown() instead of the
      * default "terminate immediately".
+     *
+     * The handler itself only writes a byte to a self-pipe; requestShutdown()
+     * runs from the loop, once the pipe turns readable. An async handler runs
+     * between ANY two statements of the code it interrupts, so calling
+     * requestShutdown() from there changed the loop's state mid-pass: a
+     * shutdown timer registered while TimerManager::tick() was rebuilding its
+     * list was overwritten along with it, leaving a server that had stopped
+     * accepting but would never stop.
      */
     private function installSignalHandlers(): void
     {
+        $pipe = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
+
+        if ($pipe === false) {
+            throw new RuntimeException('Could not create the signal self-pipe.');
+        }
+
+        [$signalRead, $signalWrite] = $pipe;
+        stream_set_blocking($signalRead, false);
+        stream_set_blocking($signalWrite, false);
+
+        $this->eventLoop->onReadable($signalRead, function () use ($signalRead): void {
+            @fread($signalRead, 64);
+            $this->requestShutdown();
+        });
+
         // Delivered as they arrive rather than only at pcntl_signal_dispatch()
         // calls: the loop spends most of its life inside stream_select(),
         // which is exactly where a shutdown request has to be able to reach
-        // it.
+        // it - the signal interrupts the select, and the pipe is then ready.
         pcntl_async_signals(true);
 
-        pcntl_signal(SIGTERM, $this->requestShutdown(...));
-        pcntl_signal(SIGINT, $this->requestShutdown(...));
+        $onShutdownSignal = static function () use ($signalWrite): void {
+            @fwrite($signalWrite, 'S');
+        };
+        pcntl_signal(SIGTERM, $onShutdownSignal);
+        pcntl_signal(SIGINT, $onShutdownSignal);
 
         // Reap forked snapshot children so they don't linger as zombies.
         pcntl_signal(SIGCHLD, function (): void {
