@@ -207,6 +207,50 @@ final class SelectLoopTest extends TestCase
         self::assertSame(2, $loop->tick(1));
     }
 
+    public function testAWaitCutShortByASignalDispatchesNothing(): void
+    {
+        // Keep $b alive and silent: $a is watched but never becomes ready.
+        [$a, $b] = $this->pairOfSockets();
+        $loop = new SelectLoop();
+
+        $dispatched = 0;
+        $loop->onReadable($a, function () use (&$dispatched): void {
+            $dispatched++;
+        });
+
+        pcntl_async_signals(true);
+        pcntl_signal(SIGUSR1, static fn () => null);
+
+        // The signal has to land while the loop is blocked in select(), the
+        // way a SIGTERM asking for a graceful shutdown does. A child is the
+        // only way to deliver it from outside that wait.
+        $parent = posix_getpid();
+        $pid = pcntl_fork();
+        self::assertNotSame(-1, $pid);
+
+        if ($pid === 0) {
+            usleep(50_000);
+            posix_kill($parent, SIGUSR1);
+            // SIGKILL rather than exit(): the child inherited PHPUnit, and a
+            // clean exit would run its shutdown handlers and report a second
+            // set of results.
+            posix_kill(posix_getpid(), SIGKILL);
+        }
+
+        try {
+            $ready = $loop->tick(2);
+        } finally {
+            pcntl_waitpid($pid, $status);
+            pcntl_signal(SIGUSR1, SIG_DFL);
+        }
+
+        // stream_select() reports an interruption by returning false and
+        // leaving the arrays it was given untouched - which reads exactly
+        // like "every watched stream is ready".
+        self::assertSame(0, $ready);
+        self::assertSame(0, $dispatched);
+    }
+
     /**
      * @return array{0: resource, 1: resource}
      */

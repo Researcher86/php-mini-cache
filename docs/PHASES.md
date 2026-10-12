@@ -101,6 +101,15 @@ one test answers for one line of the plan. The whole suite runs with
 - [x] Phase 28 — Tests
 - [x] Phase 29 — Benchmarks
 - [x] Phase 30 — Experiments
+- [x] Phase 31 — Strict RESP
+- [x] Phase 32 — High/Low Watermarks
+- [x] Phase 33 — Expiration Heap
+- [x] Phase 34 — Event Loop Metrics
+- [x] Phase 35 — Forked Persistence Worker
+- [ ] Phase 36 — Epoll Loop (deferred)
+- [x] Phase 37 — Load Testing
+- [x] Phase 38 — Client SDK
+- [x] Phase 39 — Bounded Work and Lifecycle Correctness
 
 ---
 
@@ -127,8 +136,8 @@ Create the basic project structure and development environment.
 
 No tests of its own - this phase produced the harness every other phase is
 asserted with: [phpunit.xml](../phpunit.xml) (a single `unit` suite over
-`tests/`), [phpstan.neon](../phpstan.neon) (level 6 over `src` and `bin`),
-run by `make test` / `make analyse`.
+`tests/`), [phpstan.neon](../phpstan.neon) (level 6 over `src` and `bin`; `examples`,
+`benchmarks` and `tests` were added later), run by `make test` / `make analyse`.
 
 ---
 
@@ -880,9 +889,12 @@ number of arguments, maximum connections.
 * [x] Per-command metrics are keyed only by names the server knows;
       unknown ones are counted as a single `unknown_commands` total, so a
       client cannot grow the counter map one made-up name at a time
-* [x] `maxConnections` (null = unbounded): a connection accepted past the
-      limit gets `-ERR max number of clients reached` and is closed
-      immediately, before it is ever tracked or counted
+* [x] `maxConnections`: a connection accepted past the limit gets
+      `-ERR max number of clients reached` and is closed immediately,
+      before it is ever tracked or counted. Originally unbounded unless
+      set; it now defaults to 512, short of `stream_select()`'s
+      FD_SETSIZE wall (see DECISIONS.md, "A failed wait is not a ready
+      list")
 
 ## Definition of Done
 

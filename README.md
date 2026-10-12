@@ -50,6 +50,27 @@ make run-client ARGS="GET name"
 command per invocation, the reply printed to stdout. It exists to make
 this demo runnable without any external CLI tool.
 
+### Server settings
+
+`bin/server.php` reads its settings from the environment. Persistence and
+the idle timeout are off unless set:
+
+| Variable | Default | Effect |
+| -------- | ------- | ------ |
+| `CACHE_HOST` | `127.0.0.1` | address to listen on (also read by `bin/client.php`, `bin/bench.php` and `examples/`) |
+| `CACHE_PORT` | `6380` | port to listen on (likewise) |
+| `CACHE_SNAPSHOT_PATH` | unset | enables persistence: the store is loaded from this file on start and saved to it on a graceful shutdown |
+| `CACHE_SNAPSHOT_INTERVAL` | unset | seconds between periodic snapshots (written by a forked child); needs `CACHE_SNAPSHOT_PATH` |
+| `CACHE_IDLE_TIMEOUT` | unset | seconds of silence after which a connection is closed |
+
+`make run-server` does not forward variables from your shell into the
+container, so set them inside it:
+
+```bash
+make shell
+CACHE_SNAPSHOT_PATH=/tmp/mini-cache.snapshot CACHE_SNAPSHOT_INTERVAL=60 CACHE_IDLE_TIMEOUT=300 php bin/server.php
+```
+
 ## Talking to it from PHP
 
 `CacheClient` is the client this project ships - a plain PHP object,
@@ -395,17 +416,18 @@ separation (Networking → Protocol → Commands → State).
 php-mini-cache/
 │
 ├── bin/
+│   ├── bootstrap.php           # finds the right vendor/autoload.php, root or installed
 │   ├── server.php              # entry point: CacheServer::run()
 │   ├── client.php              # one-shot RESP client, for the demo above
 │   └── bench.php               # throughput/latency benchmark - docs/BENCHMARKS.md
 │
 ├── benchmarks/                 # load tests: pipeline, fan-out, fairness, memory
 │   ├── README.md
-│   ├── pipeline.php, pubsub-fanout.php, fairness.php, memory.php
+│   └── pipeline.php, pubsub-fanout.php, fairness.php, memory.php
 │
 ├── examples/                   # standalone scripts, one question each
 │   ├── bootstrap.php
-│   ├── ttl.php, pipelining.php, pubsub.php, slow-client.php
+│   └── ttl.php, pipelining.php, pubsub.php, slow-client.php
 │
 ├── src/
 │   │
@@ -429,6 +451,7 @@ php-mini-cache/
 │   │   └── WriteBuffer.php
 │   │
 │   ├── Protocol/
+│   │   ├── RespType.php
 │   │   ├── RespValue.php
 │   │   ├── RespParser.php
 │   │   ├── RespEncoder.php
@@ -438,11 +461,13 @@ php-mini-cache/
 │   │   ├── Command.php
 │   │   ├── CommandDispatcher.php
 │   │   ├── CommandHandler.php
+│   │   ├── CommandException.php
 │   │   └── Handler/
 │   │       ├── PingCommand.php, SetCommand.php, GetCommand.php,
 │   │       │   DelCommand.php, ExistsCommand.php, IncrCommand.php
 │   │       ├── SubscribeCommand.php, PublishCommand.php
-│   │       ├── MultiCommand.php, ExecCommand.php, DiscardCommand.php
+│   │       ├── MultiCommand.php, ExecCommand.php, DiscardCommand.php,
+│   │       │   WatchCommand.php, UnwatchCommand.php
 │   │       └── InfoCommand.php
 │   │
 │   ├── Storage/
@@ -458,7 +483,8 @@ php-mini-cache/
 │   │   └── ChannelRegistry.php
 │   │
 │   ├── Transaction/
-│   │   └── TransactionManager.php
+│   │   ├── TransactionManager.php
+│   │   └── KeyWatchingStore.php  # reports every write to WATCH
 │   │
 │   ├── Metrics/
 │   │   └── ServerMetrics.php
@@ -473,9 +499,9 @@ php-mini-cache/
 │   │   └── SystemClock.php
 │   │
 │   └── Logging/
-│       ├── Logger.php, ConsoleLogger.php, NullLogger.php
+│       └── Logger.php, ConsoleLogger.php, NullLogger.php
 │
-├── tests/                       # mirrors src/, one test class per class
+├── tests/                       # mirrors src/, plus Bin/ (bootstrap.php) and Support/ (test helpers)
 │
 ├── docs/
 │   ├── ARCHITECTURE.md
@@ -484,9 +510,10 @@ php-mini-cache/
 │   ├── FAILURE-MODEL.md
 │   └── BENCHMARKS.md
 │
-├── README.md
-├── composer.json
-└── phpunit.xml
+├── .github/workflows/ci.yml     # make build install test analyse format-check
+├── Dockerfile, docker-compose.yml, Makefile
+├── composer.json, phpunit.xml, phpstan.neon, .php-cs-fixer.dist.php
+└── README.md
 ```
 
 ---
@@ -1637,58 +1664,6 @@ everything above talks to the server with.
 
 ---
 
-# PHP Systems Lab
-
-This project is part of [**PHP Systems Lab**](https://github.com/Researcher86/php-systems-lab) — a collection of small
-educational PHP projects that rebuild the mechanisms behind backend
-infrastructure in order to understand them. The recommended order:
-
-| Level | Project | Focus |
-| ----- | ------- | ----- |
-| 1 | 🧠 [`php-memory-lab`](https://github.com/Researcher86/php-memory-lab) | memory, RSS, fork, copy-on-write, `mmap`, shared memory, FFI |
-| 2 | ⚡ [`php-concurrency`](https://github.com/Researcher86/php-concurrency) | processes, IPC, concurrency patterns, event loops, Fibers (course in Russian) |
-| 3 | ⚙️ [`php-worker-pool`](https://github.com/Researcher86/php-worker-pool) | persistent master/worker pool, supervision, graceful shutdown |
-| 4 | 📬 [`php-job-queue`](https://github.com/Researcher86/php-job-queue) | reliable background jobs: delivery leases, ACK, retries, DLQ |
-| **5** | 💾 **`php-mini-cache`** (this project) | **event-driven in-memory server: RESP, pipelining, TTL, Pub/Sub** |
-| 6 | 🌐 [`php-mini-http-server`](https://github.com/Researcher86/php-mini-http-server) | event-driven HTTP server: parsing, routing, middleware, keep-alive |
-| 7 | 🗄️ [`php-mini-database`](https://github.com/Researcher86/php-mini-database) | relational engine: pages, B-trees, SQL, transactions, WAL, recovery |
-| 8 | 🏗️ [`php-systems-platform`](https://github.com/Researcher86/php-systems-platform) | integration of the components into one backend platform |
-
-These are teaching projects, not libraries: a mechanism travels between them
-by being read in one and reimplemented in the next. Levels 1–7 do not depend
-on each other as packages. Only [`php-systems-platform`](https://github.com/Researcher86/php-systems-platform) requires the
-five components (worker pool, job queue, cache, HTTP server, database)
-through Composer and runs them together as one system.
-
-## How this project relates
-
-**[`php-memory-lab`](https://github.com/Researcher86/php-memory-lab)** — a cache is a process whose whole job is to hold
-data in memory, and `php-memory-lab` is where the cost of holding it is
-measured. An entry that reports 200 bytes to `memory_get_usage()` does not
-move RSS by 200 bytes, and the gap is what decides how large this server can
-grow.
-
-**[`php-worker-pool`](https://github.com/Researcher86/php-worker-pool)** — the other concurrency model. The pool manages
-many worker processes; this server handles many clients in one:
-
-```text
-php-worker-pool     many processes,  one request each
-php-mini-cache      one process + one event loop + many client connections
-```
-
-**[`php-mini-http-server`](https://github.com/Researcher86/php-mini-http-server)** — the same event-loop design (non-blocking
-sockets, read/write buffers, backpressure, timers) applied to HTTP instead of
-RESP. The two share ideas, not code.
-
-**[`php-mini-database`](https://github.com/Researcher86/php-mini-database)** — the opposite side of the persistence
-problem: this project asks how data can be kept *fast*, the database asks how
-it can be kept *safe*.
-
-**[`php-systems-platform`](https://github.com/Researcher86/php-systems-platform)** — uses this server as its cache tier
-(`src/Cache/CacheService.php`, through the `CacheClient` SDK).
-
----
-
 # What This Project Is Not
 
 This project is intentionally **not** trying to become a production-grade cache server.
@@ -1809,6 +1784,58 @@ The project should remain:
 > **Simple enough to modify.**
 
 > **Complex enough to demonstrate real server engineering problems.**
+
+---
+
+# PHP Systems Lab
+
+This project is part of [**PHP Systems Lab**](https://github.com/Researcher86/php-systems-lab) — a collection of small
+educational PHP projects that rebuild the mechanisms behind backend
+infrastructure in order to understand them. The recommended order:
+
+| Level | Project | Focus |
+| ----- | ------- | ----- |
+| 1 | 🧠 [`php-memory-lab`](https://github.com/Researcher86/php-memory-lab) | memory, RSS, fork, copy-on-write, `mmap`, shared memory, FFI |
+| 2 | ⚡ [`php-concurrency`](https://github.com/Researcher86/php-concurrency) | processes, IPC, concurrency patterns, event loops, Fibers (course in Russian) |
+| 3 | ⚙️ [`php-worker-pool`](https://github.com/Researcher86/php-worker-pool) | persistent master/worker pool, supervision, graceful shutdown |
+| 4 | 📬 [`php-job-queue`](https://github.com/Researcher86/php-job-queue) | reliable background jobs: delivery leases, ACK, retries, DLQ |
+| **5** | 💾 **`php-mini-cache`** (this project) | **event-driven in-memory server: RESP, pipelining, TTL, Pub/Sub** |
+| 6 | 🌐 [`php-mini-http-server`](https://github.com/Researcher86/php-mini-http-server) | event-driven HTTP server: parsing, routing, middleware, keep-alive |
+| 7 | 🗄️ [`php-mini-database`](https://github.com/Researcher86/php-mini-database) | relational engine: pages, B-trees, SQL, transactions, WAL, recovery |
+| 8 | 🏗️ [`php-systems-platform`](https://github.com/Researcher86/php-systems-platform) | integration of the components into one backend platform |
+
+These are teaching projects, not libraries: a mechanism travels between them
+by being read in one and reimplemented in the next. Levels 1–7 do not depend
+on each other as packages. Only [`php-systems-platform`](https://github.com/Researcher86/php-systems-platform) requires the
+five components (worker pool, job queue, cache, HTTP server, database)
+through Composer and runs them together as one system.
+
+## How this project relates
+
+**[`php-memory-lab`](https://github.com/Researcher86/php-memory-lab)** — a cache is a process whose whole job is to hold
+data in memory, and `php-memory-lab` is where the cost of holding it is
+measured. An entry that reports 200 bytes to `memory_get_usage()` does not
+move RSS by 200 bytes, and the gap is what decides how large this server can
+grow.
+
+**[`php-worker-pool`](https://github.com/Researcher86/php-worker-pool)** — the other concurrency model. The pool manages
+many worker processes; this server handles many clients in one:
+
+```text
+php-worker-pool     many processes,  one request each
+php-mini-cache      one process + one event loop + many client connections
+```
+
+**[`php-mini-http-server`](https://github.com/Researcher86/php-mini-http-server)** — the same event-loop design (non-blocking
+sockets, read/write buffers, backpressure, timers) applied to HTTP instead of
+RESP. The two share ideas, not code.
+
+**[`php-mini-database`](https://github.com/Researcher86/php-mini-database)** — the opposite side of the persistence
+problem: this project asks how data can be kept *fast*, the database asks how
+it can be kept *safe*.
+
+**[`php-systems-platform`](https://github.com/Researcher86/php-systems-platform)** — uses this server as its cache tier
+(`src/Cache/CacheService.php`, through the `CacheClient` SDK).
 
 ## License
 

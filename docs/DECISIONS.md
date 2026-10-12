@@ -191,6 +191,13 @@ They now advance a `FakeClock` and run in microseconds. The rule that
 came out of it: whatever records a timestamp must be given the same clock
 as whatever reads it, or the seam is decorative.
 
+The rule was broken in one place it states: a `CacheServer` given a clock
+but no loop built its own `SelectLoop` on the system clock, so its timers
+(the idle check, the sweep, the shutdown grace) ran on wall time while
+connections were stamped with the injected one. The default loop is now
+built with the server's own clock, pinned by
+`CacheServerTest::testTheDefaultEventLoopRunsOnTheServersClock`.
+
 ## The idle-timeout and expiration-sweep timers share one interval parameter
 
 `CacheServer`'s `idleTimeoutSeconds` doubles as both the threshold *and*
@@ -452,3 +459,35 @@ Rather than ship a `--daemon` flag whose liveness check silently lies in
 the one environment (a bare container) most likely to run it, the feature
 is left out here, matching the same call already made in
 `php-worker-pool`. `bin/*.php` stay foreground-only.
+
+## A failed wait is not a ready list
+
+`stream_select()` has three outcomes, and `SelectLoop` handled two of them.
+It can report how many streams are ready, it can report zero - and it can
+fail, returning `false` and leaving the arrays it was given exactly as they
+were passed in. The loop turned `false` into `0` but kept those untouched
+arrays, so `tick()` dispatched every watched stream as if it were ready.
+
+The failure is not exotic: it is what any handled signal looks like from
+inside the wait. Client connections survived it only because
+`watchForIncomingData()` tells a spurious wakeup from a closed peer with
+`feof()`. The signal self-pipe's listener has no such check - it reads,
+then calls `requestShutdown()` - and `SIGCHLD` is a handled signal. So
+with periodic snapshots on, the first forked snapshot child to exit
+interrupted the wait, the pipe was "ready", and the server shut itself
+down a fraction of a second after starting. The sibling
+php-mini-http-server met the same bug through SIGTERM (its handlers closed
+every quiet keep-alive client the moment it was signalled) and recorded it
+under the same name. The loop now empties both arrays when the wait
+fails, pinned by `SelectLoopTest::testAWaitCutShortByASignalDispatchesNothing`
+and, end to end, `CacheServerTest::testAFinishedSnapshotChildDoesNotShutTheServerDown`.
+
+Fixing it made a second limit worth having. `select()` also fails when a
+descriptor is numbered at or above `FD_SETSIZE` (1024 in a standard PHP
+build), and it fails the *whole* wait, not the offending stream. Handled
+correctly, that is a loop spinning on a wait that can never succeed, for
+every client at once. `maxConnections` used to default to unbounded; it
+now defaults to `CacheServer::DEFAULT_MAX_CONNECTIONS` (512, the same
+number the sibling uses), well short of the wall, and a connection past it
+is accepted, told `-ERR max number of clients reached`, and closed - the
+behaviour an explicit limit already had - rather than left in the backlog.

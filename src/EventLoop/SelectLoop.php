@@ -179,9 +179,20 @@ final class SelectLoop implements EventLoop
         $ready = @stream_select($read, $write, $except, $seconds, $microseconds);
 
         // False means the wait was cut short by a signal (EINTR) - which is
-        // how a shutdown request reaches a loop sitting in select(). Nothing
-        // is ready; the next pass waits again.
-        return $ready === false ? 0 : $ready;
+        // how a shutdown request reaches a loop sitting in select(). The
+        // arrays are then left exactly as they were passed in, which reads
+        // identically to "every watched stream is ready", so they are
+        // emptied here: dispatching on them would hand each idle connection
+        // a read that returns nothing. Nothing is ready; the next pass
+        // waits again.
+        if ($ready === false) {
+            $read = [];
+            $write = [];
+
+            return 0;
+        }
+
+        return $ready;
     }
 
     private function shorterWait(?float $a, ?float $b): ?float

@@ -113,7 +113,7 @@ final class ForkingSnapshotWorkerTest extends TestCase
     {
         for ($i = 0; $i < 200; $i++) {
             clearstatcache(true, $this->path);
-            if ((filesize($this->path) ?? 0) > 0) {
+            if ((int) filesize($this->path) > 0) {
                 return;
             }
             usleep(10_000);

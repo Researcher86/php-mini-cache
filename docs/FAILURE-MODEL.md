@@ -113,7 +113,7 @@ catches a value that can *never* complete; a client sending many small,
 individually-valid commands in a slow drip is not rate-limited by it at
 all, and there is no per-client accounting (one client's oversized buffer
 disconnects only that client, but a moderate one from each of many
-connections is still bounded only by `maxConnections`, if set).
+connections is still bounded only by `maxConnections`, 512 by default).
 
 ## Timers are best-effort, not exact
 

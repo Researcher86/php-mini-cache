@@ -5,3 +5,4 @@ parameters:
         - bin
         - examples
         - benchmarks
+        - tests

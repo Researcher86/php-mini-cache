@@ -23,6 +23,12 @@ interface Store
      */
     public function setKeepingTtl(string $key, mixed $value): bool;
 
+    /**
+     * Not a pure read: an expired key is removed on the way, and anything
+     * else may have written the key between two calls.
+     *
+     * @phpstan-impure
+     */
     public function get(string $key): mixed;
 
     public function has(string $key): bool;

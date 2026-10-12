@@ -815,6 +815,41 @@ final class CacheServerTest extends TestCase
         }
     }
 
+    public function testAFinishedSnapshotChildDoesNotShutTheServerDown(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'mini-cache-snapshot-');
+        $loop = new SelectLoop();
+
+        try {
+            $server = new CacheServer(
+                new ServerConfig(host: '127.0.0.1', port: 0),
+                $loop,
+                snapshotPath: $path,
+                snapshotIntervalSeconds: 0.05,
+            );
+
+            // The forked child's exit raises SIGCHLD in this process, which
+            // interrupts the loop's select(). A failed wait used to be read
+            // as "everything is ready" - the signal pipe included - and the
+            // pipe's listener asks for a shutdown, so the first periodic
+            // snapshot stopped the server.
+            $stoppedByTest = false;
+            $loop->after(0.5, function () use ($server, &$stoppedByTest): void {
+                $stoppedByTest = true;
+                $server->stop();
+            });
+
+            $server->run();
+
+            self::assertTrue($stoppedByTest, 'The server stopped itself before the test stopped it.');
+        } finally {
+            @unlink($path);
+            foreach (glob($path . '.*.tmp') ?: [] as $leftover) {
+                @unlink($leftover);
+            }
+        }
+    }
+
     public function testAGracefulShutdownSnapshotsWhatWasWrittenSinceTheLastOne(): void
     {
         $path = tempnam(sys_get_temp_dir(), 'mini-cache-snapshot-');
@@ -1088,6 +1123,72 @@ final class CacheServerTest extends TestCase
 
             fclose($clientA);
             fclose($clientB);
+        } finally {
+            $server->stop();
+        }
+    }
+
+    public function testConnectionsAreCappedByDefaultWellShortOfFdSetsize(): void
+    {
+        // No maxConnections given: the default still has to stop the server
+        // before stream_select() meets a descriptor it cannot watch.
+        $server = new CacheServer(new ServerConfig(host: '127.0.0.1', port: 0));
+        $clients = [];
+
+        try {
+            // One at a time rather than all at once: connections the server
+            // has not accepted yet wait in a listen backlog much shorter
+            // than the cap.
+            for ($i = 0; $i < CacheServer::DEFAULT_MAX_CONNECTIONS; $i++) {
+                $client = @stream_socket_client('tcp://' . $server->localAddress(), $errno, $errstr, 5);
+                self::assertIsResource($client, $errstr);
+                $clients[] = $client;
+                self::assertInstanceOf(ClientConnection::class, $server->acceptClient(5));
+            }
+
+            $refused = @stream_socket_client('tcp://' . $server->localAddress(), $errno, $errstr, 5);
+            self::assertIsResource($refused, $errstr);
+            $clients[] = $refused;
+
+            self::assertNull($server->acceptClient(5));
+            self::assertSame(CacheServer::DEFAULT_MAX_CONNECTIONS, $server->connectedClientCount());
+            self::assertStringStartsWith('-ERR max number of clients reached', fread($refused, 1024));
+        } finally {
+            $server->stop();
+
+            foreach ($clients as $client) {
+                fclose($client);
+            }
+        }
+    }
+
+    public function testTheDefaultEventLoopRunsOnTheServersClock(): void
+    {
+        // No loop passed in, only a clock: the loop the server builds for
+        // itself has to be driven by that same clock, or the idle timer
+        // below would wait on wall time while connections are stamped with
+        // fake time.
+        $clock = new FakeClock(1000.0);
+        $server = new CacheServer(
+            new ServerConfig(host: '127.0.0.1', port: 0),
+            idleTimeoutSeconds: 0.3,
+            clock: $clock,
+        );
+        $loop = new ReflectionProperty($server, 'eventLoop')->getValue($server);
+        self::assertInstanceOf(SelectLoop::class, $loop);
+
+        try {
+            $client = @stream_socket_client('tcp://' . $server->localAddress(), $errno, $errstr, 5);
+            self::assertIsResource($client, $errstr);
+            $connection = $server->acceptClient(5);
+            self::assertInstanceOf(ClientConnection::class, $connection);
+
+            $clock->advance(0.4);
+            $loop->tick(0);
+
+            self::assertSame(ConnectionState::Closed, $connection->state());
+
+            fclose($client);
         } finally {
             $server->stop();
         }
@@ -1518,7 +1619,7 @@ final class CacheServerTest extends TestCase
         // returning the stale empty size.
         for ($i = 0; $i < 200; $i++) {
             clearstatcache(true, $path);
-            if ((filesize($path) ?? 0) > 0) {
+            if ((int) filesize($path) > 0) {
                 return;
             }
             usleep(10_000);

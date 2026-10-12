@@ -2,7 +2,7 @@
 
 `bin/bench.php` (documented in [docs/BENCHMARKS.md](../docs/BENCHMARKS.md))
 measures single-command throughput and latency. These scripts answer the
-other load questions the review called for: sustained **pipelined**
+other load questions worth asking of a cache server: sustained **pipelined**
 throughput, **Pub/Sub fan-out** to many subscribers, and **memory**
 growth. The `examples/` directory holds the single-connection
 demonstrations of the same behaviors.

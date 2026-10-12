@@ -3,10 +3,12 @@
 declare(strict_types=1);
 
 /*
- * Shared with the sibling projects in php-systems-lab, so that code moving
- * between them does not change shape on the way: PSR-12, strict types in
- * every file, ordered imports, and native functions called by their plain
- * names.
+ * PSR-12, strict types in every file, ordered imports, and native functions
+ * called by their plain names. php-memory-lab, php-worker-pool and
+ * php-systems-platform use this same rule set; php-job-queue,
+ * php-mini-http-server and php-mini-database are on PER-CS 2.0 with
+ * imported global classes instead, so the projects in php-systems-lab do
+ * not all share one style.
  *
  * Two rules are switched off deliberately. native_function_invocation would
  * prefix every internal call with a backslash, and single_line_empty_body

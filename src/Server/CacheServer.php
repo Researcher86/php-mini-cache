@@ -79,6 +79,17 @@ final class CacheServer
      */
     private const int WRITE_CHUNK_BYTES = 256 * 1024;
 
+    /**
+     * How many clients are served at once unless told otherwise.
+     *
+     * stream_select() cannot watch a descriptor numbered at or above
+     * FD_SETSIZE (1024 in a standard PHP build), and it fails the whole wait
+     * rather than just that stream - so one connection too many stalls every
+     * other. 512 leaves the listening socket, the signal pipe, snapshot
+     * files and whatever else the process has open well clear of that wall.
+     */
+    public const int DEFAULT_MAX_CONNECTIONS = 512;
+
     private readonly ServerSocket $socket;
     private readonly ConnectionManager $connections;
     private readonly EventLoop $eventLoop;
@@ -124,8 +135,9 @@ final class CacheServer
         // arguments (e.g. a scripted client gone wrong), independent of
         // the byte-size limit above.
         private readonly int $maxArgumentsPerCommand = 1024,
-        // Null means unbounded.
-        private readonly ?int $maxConnections = null,
+        // Bounded by default, and deliberately low - see
+        // DEFAULT_MAX_CONNECTIONS.
+        private readonly int $maxConnections = self::DEFAULT_MAX_CONNECTIONS,
         // How much a connection's WriteBuffer may hold before reading from
         // it is paused - a slow reader (or one that never reads at all)
         // must not let responses queue up without bound while its socket
@@ -149,7 +161,7 @@ final class CacheServer
         $this->hardSubscriberWriteBufferBytes = $hardSubscriberWriteBufferBytes ?? $this->maxWriteBufferBytes * 4;
         $this->socket = new ServerSocket($config);
         $this->connections = new ConnectionManager();
-        $this->eventLoop = $eventLoop ?? new SelectLoop();
+        $this->eventLoop = $eventLoop ?? new SelectLoop($this->clock);
         $this->dispatcher = $dispatcher ?? CommandDispatcher::withDefaultHandlers();
         $this->store = $store ?? new InMemoryStore();
         // The parser's own bulk-string ceiling is derived from the read
@@ -247,7 +259,7 @@ final class CacheServer
             return null;
         }
 
-        if ($this->maxConnections !== null && $this->connections->count() >= $this->maxConnections) {
+        if ($this->connections->count() >= $this->maxConnections) {
             // Written straight to the socket and best-effort: this
             // connection is never tracked, never given buffers, and never
             // gets a second event loop pass to finish a partial write on.
@@ -268,6 +280,12 @@ final class CacheServer
         return $connection;
     }
 
+    /**
+     * Changes under the caller between two calls - clients come and go from
+     * inside the loop - so a static analyser must not remember the answer.
+     *
+     * @phpstan-impure
+     */
     public function connectedClientCount(): int
     {
         return $this->connections->count();

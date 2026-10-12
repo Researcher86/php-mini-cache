@@ -83,7 +83,6 @@ final class TransactionManagerTest extends TestCase
         self::assertFalse($transactions->isActive($b));
     }
 
-    /** @param list<string> $arguments */
     public function testAWriteToAWatchedKeyMarksTheWatcherDirty(): void
     {
         $transactions = new TransactionManager();
@@ -134,6 +133,7 @@ final class TransactionManagerTest extends TestCase
         self::assertFalse($transactions->isDirty($connection));
     }
 
+    /** @param list<string> $arguments */
     private function command(string $name, array $arguments = []): Command
     {
         $elements = array_map(RespValue::bulkString(...), [$name, ...$arguments]);
