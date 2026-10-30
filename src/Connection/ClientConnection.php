@@ -38,10 +38,11 @@ final class ClientConnection
      * outside this class keys on (subscriptions, open transactions, the
      * paused-reading set) rather than passing the object around.
      *
-     * Worth knowing: the id stays readable after the socket is closed, but
-     * the number itself is reused by whatever the process opens next. A
-     * registry that fails to drop a closed connection's entry does not just
-     * leak it - it hands it to an unrelated connection later on.
+     * Worth knowing: the id stays readable after the socket is closed, and
+     * PHP never hands the number out again within the process. A registry
+     * that fails to drop a closed connection's entry therefore never mixes
+     * it up with a later connection - it leaks it, for as long as the
+     * server runs.
      */
     public function id(): int
     {

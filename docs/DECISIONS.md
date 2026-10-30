@@ -230,9 +230,9 @@ to answer, including the protocol-error reply at the end.
 The same failure left a second mark: `pauseReadingIfWriteBufferTooLarge()`
 ran *after* the failed flush and put the dropped connection's id back into
 `pausedConnections`, which `disconnectClient()` had just cleaned out.
-Nothing removes it again, and because ids are socket resource ids they get
-reused - the next connection to land on that id looks paused, so
-backpressure silently stops applying to it. Pinned by
+Nothing removes it again: ids are socket resource ids, and PHP never reuses
+one within a process, so the entry stays for the life of the server - one
+leaked id per client that vanishes mid-pipeline. Pinned by
 `CacheServerTest::testAClientThatVanishesMidPipelineDoesNotTakeTheServerDown`.
 
 ## `Store` grew `setKeepingTtl()` rather than letting INCR reset a TTL

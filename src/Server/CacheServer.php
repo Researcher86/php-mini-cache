@@ -610,8 +610,8 @@ final class CacheServer
 
         // The flush above may have dropped the connection, which already
         // cleaned up its paused-reading bookkeeping - pausing it now would
-        // put an entry back that nothing will ever remove, and leave the
-        // next connection to reuse that socket id looking paused.
+        // put an entry back that nothing will ever remove: socket ids are
+        // never reused, so it would stay there for the life of the server.
         if ($connection->state() === ConnectionState::Closed) {
             return;
         }

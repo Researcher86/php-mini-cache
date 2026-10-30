@@ -13,9 +13,10 @@ use PhpMiniCache\Connection\ClientConnection;
  * than by the object, so a channel's subscribers are a plain array and a
  * connection can be removed from every channel without a scan for object
  * identity. The price is that entries must be dropped explicitly when a
- * connection goes (`CacheServer::disconnectClient()` does it): those ids
- * are reused by later connections, so a leftover entry does not merely
- * leak, it eventually points at someone else.
+ * connection goes (`CacheServer::disconnectClient()` does it): PHP never
+ * reuses those ids, so nothing else would ever remove a leftover entry -
+ * it would keep the closed connection, and every PUBLISH to its channel
+ * would keep visiting it, for as long as the server runs.
  */
 final class ChannelRegistry
 {
