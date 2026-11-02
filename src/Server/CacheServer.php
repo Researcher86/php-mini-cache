@@ -692,7 +692,8 @@ final class CacheServer
      * so pausing that connection's reads throttles nothing at all. A
      * subscriber that never reads would queue messages until the server
      * ran out of memory - with backpressure "working" the whole time,
-     * since its own reads have been paused since the first megabyte.
+     * since its own reads have been paused since its write buffer passed
+     * maxWriteBufferBytes.
      *
      * Past the hard limit it is dropped instead. The same line is drawn
      * for the same reason (the reference `client-output-buffer-limit pubsub`
