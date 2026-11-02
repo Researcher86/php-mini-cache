@@ -1078,7 +1078,8 @@ Small, standalone scripts under `examples/`, each answering one question
       shared by every script below, so each one is only about the one
       thing it demonstrates
 * [x] `examples/ttl.php` - a key set with `EX` outlives being read once,
-      then disappears once its TTL passes
+      then disappears once its TTL passes, and `INFO`'s `expired_keys`
+      shows the sweep removed it before anyone read it again
 * [x] `examples/pipelining.php` - the same 500 `PING`s, timed one at a
       time vs. pipelined
 * [x] `examples/pubsub.php` - a forked subscriber (`pcntl_fork()`, since a
